@@ -24,11 +24,15 @@ export class Property {
 
   @Column()
   zipCode: string;
+  
   @Column()
   type: string;
 
   @Column()
   surface: number;
+
+  @Column({ nullable: true })
+  image: string;
 
   @ManyToOne(() => User, (user) => user.id)
   user: User;

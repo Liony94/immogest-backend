@@ -9,6 +9,7 @@ import databaseConfig from './config/database.config';
 import { Property } from './entities/property.entity';
 import { Tenant } from './entities/tenant.entity';
 import { UserModule } from './user/user.module';
+import { PropertyModule } from './property/property.module';
 
 @Module({
   imports: [
@@ -27,6 +28,7 @@ import { UserModule } from './user/user.module';
     TypeOrmModule.forFeature([User, Property, Tenant]),
     AuthModule,
     UserModule,
+    PropertyModule,
   ],
   controllers: [AppController],
   providers: [AppService],
