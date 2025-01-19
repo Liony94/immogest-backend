@@ -18,6 +18,11 @@ export class PropertyController {
     return this.propertyService.findAll();
   }
 
+  @Get('owner')
+  findPropertiesByOwner(@Request() req) {
+    return this.propertyService.findPropertiesByOwner(req.user.id);
+  }
+
   @Get(':id')
   findOne(@Param('id') id: string) {
     return this.propertyService.findOne(+id);

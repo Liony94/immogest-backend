@@ -53,6 +53,13 @@ export class PropertyService {
     });
   }
 
+  async findPropertiesByOwner(ownerId: number): Promise<Property[]> {
+    return this.propertyRepository.find({
+      where: { user: { id: ownerId } },
+      relations: ['tenants', 'user'],
+    });
+  }
+
   async findOne(id: number): Promise<Property> {
     return this.propertyRepository.findOne({
       where: { id },
