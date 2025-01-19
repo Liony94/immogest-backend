@@ -1,6 +1,5 @@
-import { Entity, PrimaryGeneratedColumn, Column, ManyToOne, OneToMany } from 'typeorm';
+import { Entity, PrimaryGeneratedColumn, Column, ManyToOne, OneToMany, ManyToMany, JoinTable } from 'typeorm';
 import { User } from './user.entity';
-import { Tenant } from './tenant.entity';
 
 @Entity()
 export class Property {
@@ -34,9 +33,10 @@ export class Property {
   @Column({ nullable: true })
   image: string;
 
-  @ManyToOne(() => User, (user) => user.id)
+  @ManyToOne(() => User, user => user.properties)
   user: User;
 
-  @OneToMany(() => Tenant, (tenant) => tenant.property)
-  tenants: Tenant[];
+  @ManyToMany(() => User, user => user.rentedProperties)
+  @JoinTable()
+  tenants: User[]; 
 }

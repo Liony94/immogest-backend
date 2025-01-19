@@ -1,7 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { CreateUserDto } from './dto/create-user.dto';
-import { User } from 'src/entities/user.entity';
+import { User, UserRole } from 'src/entities/user.entity';
 import { Repository } from 'typeorm';
 import * as bcrypt from 'bcrypt';
 import { JwtService } from '@nestjs/jwt';
@@ -21,6 +21,7 @@ export class AuthService {
     const user = this.userRepository.create({
       ...createUserDto,
       password: hashedPassword,
+      role: createUserDto.role || UserRole.TENANT,
     });
     return this.userRepository.save(user);
   }
@@ -38,7 +39,11 @@ export class AuthService {
   }
 
   async login(user: Omit<User, 'password'>) {
-    const payload = { email: user.email, sub: user.id };
+    const payload = { 
+      email: user.email, 
+      sub: user.id,
+      role: user.role
+    };
     return {
       access_token: this.jwtService.sign(payload),
     };

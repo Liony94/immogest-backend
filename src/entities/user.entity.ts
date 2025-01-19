@@ -1,6 +1,10 @@
-import { Entity, PrimaryGeneratedColumn, Column, OneToMany } from 'typeorm';
+import { Entity, PrimaryGeneratedColumn, Column, OneToMany, ManyToMany } from 'typeorm';
 import { Property } from './property.entity';
-import { Tenant } from './tenant.entity';
+
+export enum UserRole {
+  OWNER = 'owner',
+  TENANT = 'tenant'
+}
 
 @Entity()
 export class User {
@@ -19,8 +23,12 @@ export class User {
   @Column()
   lastName: string;
 
-  @Column({ default: 'user' })
-  role: string;
+  @Column({
+    type: 'enum',
+    enum: UserRole,
+    default: UserRole.TENANT
+  })
+  role: UserRole;
 
   @Column({ unique: true, nullable: true })
   phone: string;
@@ -31,6 +39,6 @@ export class User {
   @OneToMany(() => Property, (property) => property.user)
   properties: Property[];
 
-  @OneToMany(() => Tenant, (tenant) => tenant.user)
-  tenants: Tenant[];
+  @ManyToMany(() => Property, (property) => property.tenants)
+  rentedProperties: Property[];
 }

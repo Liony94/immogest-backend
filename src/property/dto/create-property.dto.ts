@@ -1,4 +1,3 @@
-import { Tenant } from "src/entities/tenant.entity";
 import { User } from "src/entities/user.entity";
 
 export type CreatePropertyDto = {
@@ -10,7 +9,8 @@ export type CreatePropertyDto = {
   zipCode: string;
   type: string;
   surface: number;
-  tenants: Tenant[];
+  users: User[];
   image: string;
 };
+
 

@@ -3,7 +3,6 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { Property } from 'src/entities/property.entity';
 import { Repository } from 'typeorm';
 import { CreatePropertyDto } from './dto/create-property.dto';
-import { Tenant } from 'src/entities/tenant.entity';
 import { User } from 'src/entities/user.entity';
 
 @Injectable()
@@ -11,8 +10,6 @@ export class PropertyService {
   constructor(
     @InjectRepository(Property)
     private propertyRepository: Repository<Property>,
-    @InjectRepository(Tenant)
-    private tenantRepository: Repository<Tenant>,
   ) {}
 
   async create(createPropertyDto: CreatePropertyDto, user: User): Promise<Property> {
@@ -31,12 +28,14 @@ export class PropertyService {
 
     const savedProperty = await this.propertyRepository.save(property);
 
-    if (createPropertyDto.tenants && createPropertyDto.tenants.length > 0) {
-      for (const tenant of createPropertyDto.tenants) {
-        await this.tenantRepository.update(tenant.id, {
-          property: savedProperty,
-        });
-      }
+    if (createPropertyDto.users && createPropertyDto.users.length > 0) {
+      const property = await this.propertyRepository.findOne({
+        where: { id: savedProperty.id },
+        relations: ['tenants'],
+      });
+      
+      property.tenants = createPropertyDto.users;
+      await this.propertyRepository.save(property);
       
       return this.propertyRepository.findOne({
         where: { id: savedProperty.id },
