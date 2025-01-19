@@ -10,6 +10,8 @@ export class PropertyService {
   constructor(
     @InjectRepository(Property)
     private propertyRepository: Repository<Property>,
+    @InjectRepository(User)
+    private userRepository: Repository<User>,
   ) {}
 
   async create(createPropertyDto: CreatePropertyDto, user: User): Promise<Property> {
@@ -29,23 +31,19 @@ export class PropertyService {
     const savedProperty = await this.propertyRepository.save(property);
 
     if (createPropertyDto.users && createPropertyDto.users.length > 0) {
-      const property = await this.propertyRepository.findOne({
-        where: { id: savedProperty.id },
-        relations: ['tenants'],
-      });
-      
-      property.tenants = createPropertyDto.users;
-      await this.propertyRepository.save(property);
-      
-      return this.propertyRepository.findOne({
-        where: { id: savedProperty.id },
-        relations: ['tenants', 'user'],
-      });
+      const tenants = await Promise.all(
+        createPropertyDto.users.map(userId =>
+          this.userRepository.findOne({ where: { id: userId } })
+        )
+      );
+
+      savedProperty.tenants = tenants.filter(tenant => tenant !== null);
+      await this.propertyRepository.save(savedProperty);
     }
 
     return this.propertyRepository.findOne({
       where: { id: savedProperty.id },
-      relations: ['user'],
+      relations: ['tenants', 'user'],
     });
   }
 
@@ -60,5 +58,14 @@ export class PropertyService {
       where: { id },
       relations: ['tenants', 'user'],
     });
+  }
+
+  async findPropertiesByTenant(tenantId: number): Promise<Property[]> {
+    return this.propertyRepository
+      .createQueryBuilder('property')
+      .leftJoinAndSelect('property.tenants', 'tenants')
+      .leftJoinAndSelect('property.user', 'owner')
+      .where('tenants.id = :tenantId', { tenantId })
+      .getMany();
   }
 }

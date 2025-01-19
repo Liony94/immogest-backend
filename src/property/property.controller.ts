@@ -22,4 +22,9 @@ export class PropertyController {
   findOne(@Param('id') id: string) {
     return this.propertyService.findOne(+id);
   }
+
+  @Get('tenant/:id')
+  findPropertiesByTenant(@Param('id') id: string) {
+    return this.propertyService.findPropertiesByTenant(+id);
+  }
 }

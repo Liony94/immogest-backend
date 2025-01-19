@@ -14,4 +14,14 @@ export class UserController {
   findOne(@Param('id') id: string) {
     return this.userService.findOne(+id);
   }
+
+  @Get('/role/tenant')
+  findUserByRoleTenant() {
+    return this.userService.findUserByRoleTenant();
+  }
+
+  @Get('/lastname/:lastName')
+  findTenantByLastName(@Param('lastName') lastName: string) {
+    return this.userService.findTenantByLastName(lastName);
+  }
 }
