@@ -24,7 +24,7 @@ import { Tenant } from './entities/tenant.entity';
         ...configService.get('database'),
         entities: [User, Property, Owner, Tenant],
         synchronize: process.env.NODE_ENV !== 'production',
-        dropSchema: true,
+        dropSchema: false,
       }),
     }),
     TypeOrmModule.forFeature([User, Property, Owner, Tenant]),

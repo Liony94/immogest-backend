@@ -32,8 +32,8 @@ export class Property {
   @Column()
   surface: number;
 
-  @Column({ nullable: true })
-  image: string;
+  @Column('simple-array', { nullable: true })
+  images: string[];
 
   @ManyToMany(() => Tenant, tenant => tenant.rentedProperties)
   @JoinTable()

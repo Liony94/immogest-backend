@@ -26,8 +26,9 @@ export class CreatePropertyDto {
   surface: number;
 
   @IsOptional()
-  @IsString()
-  image?: string;
+  @IsArray()
+  @IsString({ each: true })
+  images?: string[];
 
   @IsOptional()
   @IsArray()
