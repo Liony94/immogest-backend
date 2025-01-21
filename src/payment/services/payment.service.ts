@@ -101,4 +101,19 @@ export class PaymentService {
       balance: totalDue - totalPaid
     };
   }
+
+  async updateLatePaymentsStatus(): Promise<{ updated: number }> {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0); // Début de la journée
+
+    const result = await this.paymentRepository
+      .createQueryBuilder()
+      .update(Payment)
+      .set({ status: PaymentStatus.LATE })
+      .where('status = :status', { status: PaymentStatus.PENDING })
+      .andWhere('dueDate < :today', { today })
+      .execute();
+
+    return { updated: result.affected || 0 };
+  }
 } 

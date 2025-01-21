@@ -71,4 +71,11 @@ export class PaymentController {
   async getPaymentStatistics(@Param('scheduleId') scheduleId: number) {
     return this.paymentService.getPaymentStatistics(scheduleId);
   }
+
+  @Post('update-late-status')
+  @Roles('OWNER')
+  @UseGuards(RoleGuard)
+  async updateLateStatus() {
+    return this.paymentService.updateLatePaymentsStatus();
+  }
 } 
