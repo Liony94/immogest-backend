@@ -6,11 +6,16 @@ import { JwtAuthGuard } from '../auth/jwh-auth.guard';
 @Controller('properties')
 @UseGuards(JwtAuthGuard)
 export class PropertyController {
-  constructor(private readonly propertyService: PropertyService) {}
+  constructor(private readonly propertyService: PropertyService) { }
 
   @Post('new')
   create(@Body() createPropertyDto: CreatePropertyDto, @Request() req) {
-    return this.propertyService.create(createPropertyDto, req.user);
+    return this.propertyService.create(createPropertyDto, req.user.id);
+  }
+
+  @Post(':id/tenants')
+  addTenants(@Param('id') id: string, @Body() body: { tenantIds: number[] }) {
+    return this.propertyService.addTenants(+id, body.tenantIds);
   }
 
   @Get()

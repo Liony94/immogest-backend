@@ -1,13 +1,8 @@
-import { Entity, PrimaryGeneratedColumn, Column, OneToMany, ManyToMany } from 'typeorm';
-import { Property } from './property.entity';
-
-export enum UserRole {
-  OWNER = 'owner',
-  TENANT = 'tenant'
-}
+import { Entity, PrimaryGeneratedColumn, Column, TableInheritance } from 'typeorm';
 
 @Entity()
-export class User {
+@TableInheritance({ column: { type: "varchar", name: "type" } })
+export abstract class User {
   @PrimaryGeneratedColumn()
   id: number;
 
@@ -23,22 +18,9 @@ export class User {
   @Column()
   lastName: string;
 
-  @Column({
-    type: 'enum',
-    enum: UserRole,
-    default: UserRole.TENANT
-  })
-  role: UserRole;
-
-  @Column({ unique: true, nullable: true })
+  @Column({ nullable: true })
   phone: string;
 
   @Column({ nullable: true })
   address: string;
-
-  @OneToMany(() => Property, (property) => property.user)
-  properties: Property[];
-
-  @ManyToMany(() => Property, (property) => property.tenants)
-  rentedProperties: Property[];
 }

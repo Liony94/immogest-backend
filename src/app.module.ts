@@ -9,6 +9,8 @@ import databaseConfig from './config/database.config';
 import { Property } from './entities/property.entity';
 import { UserModule } from './user/user.module';
 import { PropertyModule } from './property/property.module';
+import { Owner } from './entities/owner.entity';
+import { Tenant } from './entities/tenant.entity';
 
 @Module({
   imports: [
@@ -20,11 +22,12 @@ import { PropertyModule } from './property/property.module';
       inject: [ConfigService],
       useFactory: (configService: ConfigService) => ({
         ...configService.get('database'),
-        entities: [User],
+        entities: [User, Property, Owner, Tenant],
         synchronize: process.env.NODE_ENV !== 'production',
+        dropSchema: true,
       }),
     }),
-    TypeOrmModule.forFeature([User, Property]),
+    TypeOrmModule.forFeature([User, Property, Owner, Tenant]),
     AuthModule,
     UserModule,
     PropertyModule,
@@ -32,4 +35,4 @@ import { PropertyModule } from './property/property.module';
   controllers: [AppController],
   providers: [AppService],
 })
-export class AppModule {}
+export class AppModule { }

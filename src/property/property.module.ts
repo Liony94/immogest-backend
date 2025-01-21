@@ -1,13 +1,18 @@
 import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
-import { Property } from 'src/entities/property.entity';
+import { Property } from '../entities/property.entity';
 import { PropertyController } from './property.controller';
 import { PropertyService } from './property.service';
 import { User } from 'src/entities/user.entity';
+import { Owner } from '../entities/owner.entity';
+import { Tenant } from '../entities/tenant.entity';
 
 @Module({
-  imports: [TypeOrmModule.forFeature([Property, User])],
+  imports: [
+    TypeOrmModule.forFeature([Property, User, Owner, Tenant])
+  ],
   controllers: [PropertyController],
   providers: [PropertyService],
+  exports: [PropertyService]
 })
 export class PropertyModule {}
