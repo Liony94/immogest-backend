@@ -36,13 +36,17 @@ export class PaymentScheduleService {
     const startDate = new Date(schedule.startDate);
     const endDate = new Date(schedule.endDate);
     const currentDate = new Date(startDate);
+    const today = new Date();
+    today.setHours(0, 0, 0, 0); // Début de la journée
 
     while (currentDate <= endDate) {
+      const dueDate = new Date(currentDate.setDate(schedule.dayOfMonth));
+      
       const payment = this.paymentRepository.create({
         paymentSchedule: schedule,
-        dueDate: new Date(currentDate.setDate(schedule.dayOfMonth)),
+        dueDate: dueDate,
         amount: schedule.monthlyAmount,
-        status: PaymentStatus.PENDING
+        status: dueDate < today ? PaymentStatus.LATE : PaymentStatus.PENDING
       });
 
       await this.paymentRepository.save(payment);
