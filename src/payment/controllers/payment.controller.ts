@@ -1,4 +1,4 @@
-import { Controller, Post, Body, Param, Get, Put, UseGuards, Res, BadRequestException, InternalServerErrorException, NotFoundException, Query } from '@nestjs/common';
+import { Controller, Post, Body, Param, Get, Put, UseGuards, Res, BadRequestException, InternalServerErrorException, NotFoundException, Query, UnauthorizedException, Request } from '@nestjs/common';
 import { Response } from 'express';
 import { PaymentService } from '../services/payment.service';
 import { PaymentScheduleService } from '../services/payment-schedule.service';
@@ -8,16 +8,36 @@ import { JwtAuthGuard } from '../../auth/guards/jwt-auth.guard';
 import { RoleGuard } from '../../auth/guards/role.guard';
 import { Roles } from '../../auth/decorators/roles.decorator';
 import { ReceiptService } from '../services/receipt.service';
-
+import { Logger } from '@nestjs/common';
 
 @Controller('payments')
 @UseGuards(JwtAuthGuard)
 export class PaymentController {
+  private readonly logger = new Logger(PaymentController.name);
+
   constructor(
     private readonly paymentService: PaymentService,
     private readonly paymentScheduleService: PaymentScheduleService,
     private readonly receiptService: ReceiptService,
   ) {}
+
+  @Get('schedules/owner')
+  @Roles('OWNER')
+  @UseGuards(RoleGuard)
+  async getOwnerSchedules(@Request() req) {
+    try {
+      const schedules = await this.paymentScheduleService.findAll();
+      if (!schedules) {
+        return [];
+      }
+      return schedules.filter(schedule => 
+        schedule.property?.owner?.id === req.user.id
+      );
+    } catch (error) {
+      this.logger.error(`Erreur lors de la récupération des échéanciers: ${error.message}`);
+      throw new InternalServerErrorException('Erreur lors de la récupération des échéanciers');
+    }
+  }
 
   @Post('schedules')
   @Roles('OWNER')
@@ -27,18 +47,30 @@ export class PaymentController {
   }
 
   @Get('schedules')
-  async getAllSchedules() {
-    return this.paymentScheduleService.findAll();
+  @Roles('OWNER')
+  @UseGuards(RoleGuard)
+  async getAllSchedules(@Request() req) {
+    const schedules = await this.paymentScheduleService.findAll();
+    return schedules.filter(schedule => schedule.property.owner.id === req.user.id);
   }
 
   @Get('schedules/:id')
-  async getSchedule(@Param('id') id: number) {
-    return this.paymentScheduleService.findOne(id);
+  @Roles('OWNER')
+  @UseGuards(RoleGuard)
+  async getSchedule(@Param('id') id: number, @Request() req) {
+    const schedule = await this.paymentScheduleService.findOne(id);
+    if (schedule.property.owner.id !== req.user.id) {
+      throw new UnauthorizedException('Vous n\'êtes pas autorisé à accéder à cet échéancier');
+    }
+    return schedule;
   }
 
   @Get('schedules/property/:propertyId')
-  async getSchedulesByProperty(@Param('propertyId') propertyId: number) {
-    return this.paymentScheduleService.findByProperty(propertyId);
+  @Roles('OWNER')
+  @UseGuards(RoleGuard)
+  async getSchedulesByProperty(@Param('propertyId') propertyId: number, @Request() req) {
+    const schedules = await this.paymentScheduleService.findByProperty(propertyId);
+    return schedules.filter(schedule => schedule.property.owner.id === req.user.id);
   }
 
   @Get('schedules/tenant/:tenantId')
@@ -66,8 +98,9 @@ export class PaymentController {
   @Get('late')
   @Roles('OWNER')
   @UseGuards(RoleGuard)
-  async getLatePayments() {
-    return this.paymentScheduleService.getLatePayments();
+  async getLatePayments(@Request() req) {
+    const latePayments = await this.paymentScheduleService.getLatePayments();
+    return latePayments.filter(payment => payment.paymentSchedule.property.owner.id === req.user.id);
   }
 
   @Get('statistics/:scheduleId')
@@ -178,29 +211,70 @@ export class PaymentController {
     }
   }
 
+  @Get(':id/receipt/owner')
+  @Roles('OWNER')
+  @UseGuards(RoleGuard)
+  async getReceiptForOwner(
+    @Param('id') id: number,
+    @Request() req,
+    @Res() res: Response
+  ) {
+    try {
+      const payment = await this.paymentService.findOne(id);
+      
+      if (payment.paymentSchedule.property.owner.id !== req.user.id) {
+        throw new UnauthorizedException('Vous n\'êtes pas autorisé à accéder à cette quittance');
+      }
+
+      if (!payment.paidAt) {
+        throw new BadRequestException('Impossible de générer une quittance pour un paiement non effectué');
+      }
+
+      const pdfBuffer = await this.receiptService.generateAndSaveReceipt(payment);
+      
+      const month = new Date(payment.dueDate).toLocaleString('fr-FR', { month: 'long', year: 'numeric' });
+      const fileName = `quittance_${month.replace(' ', '_')}.pdf`;
+
+      res.set({
+        'Content-Type': 'application/pdf',
+        'Content-Disposition': `attachment; filename="${fileName}"`,
+        'Content-Length': pdfBuffer.length,
+      });
+
+      res.end(pdfBuffer);
+    } catch (error) {
+      if (error instanceof BadRequestException || error instanceof UnauthorizedException) {
+        throw error;
+      }
+      throw new InternalServerErrorException('Erreur lors de la génération de la quittance');
+    }
+  }
+
   @Get('receipts')
   @Roles('OWNER')
   @UseGuards(RoleGuard)
   async getAllReceipts(
+    @Request() req,
     @Query('propertyId') propertyId?: number,
     @Query('tenantId') tenantId?: number,
-    @Query('ownerId') ownerId?: number
   ) {
-    return this.receiptService.getAllReceipts(propertyId, tenantId, ownerId);
+    return this.receiptService.getAllReceipts(propertyId, tenantId, req.user.id);
   }
 
   @Get('receipts/property/:propertyId')
   @Roles('OWNER')
   @UseGuards(RoleGuard)
-  async getReceiptsByProperty(@Param('propertyId') propertyId: number) {
-    return this.receiptService.getReceiptsByProperty(propertyId);
+  async getReceiptsByProperty(@Param('propertyId') propertyId: number, @Request() req) {
+    const receipts = await this.receiptService.getReceiptsByProperty(propertyId);
+    return receipts.filter(receipt => receipt.owner.id === req.user.id);
   }
 
   @Get('receipts/tenant/:tenantId')
   @Roles('OWNER')
   @UseGuards(RoleGuard)
-  async getReceiptsByTenant(@Param('tenantId') tenantId: number) {
-    return this.receiptService.getReceiptsByTenant(tenantId);
+  async getReceiptsByTenant(@Param('tenantId') tenantId: number, @Request() req) {
+    const receipts = await this.receiptService.getReceiptsByTenant(tenantId);
+    return receipts.filter(receipt => receipt.owner.id === req.user.id);
   }
 
   @Get('receipts/owner/:ownerId')
@@ -213,7 +287,47 @@ export class PaymentController {
   @Get(':id/receipts')
   @Roles('OWNER')
   @UseGuards(RoleGuard)
-  async getReceiptsByPayment(@Param('id') paymentId: number) {
-    return this.receiptService.getReceiptsByPayment(paymentId);
+  async getReceiptsByPayment(@Param('id') paymentId: number, @Request() req) {
+    const receipts = await this.receiptService.getReceiptsByPayment(paymentId);
+    return receipts.filter(receipt => receipt.owner.id === req.user.id);
+  }
+
+  @Get(':id/receipt/owner/preview')
+  @Roles('OWNER')
+  @UseGuards(RoleGuard)
+  async previewReceiptForOwner(
+    @Param('id') id: number,
+    @Request() req,
+    @Res() res: Response
+  ) {
+    try {
+      const payment = await this.paymentService.findOne(id);
+      
+      if (payment.paymentSchedule.property.owner.id !== req.user.id) {
+        throw new UnauthorizedException('Vous n\'êtes pas autorisé à accéder à cette quittance');
+      }
+
+      if (!payment.paidAt) {
+        throw new BadRequestException('Impossible de générer une quittance pour un paiement non effectué');
+      }
+
+      const pdfBuffer = await this.receiptService.previewReceipt(payment);
+      
+      const month = new Date(payment.dueDate).toLocaleString('fr-FR', { month: 'long', year: 'numeric' });
+      const fileName = `quittance_${month.replace(' ', '_')}_preview.pdf`;
+
+      res.set({
+        'Content-Type': 'application/pdf',
+        'Content-Disposition': `inline; filename="${fileName}"`,
+        'Content-Length': pdfBuffer.length,
+      });
+
+      res.end(pdfBuffer);
+    } catch (error) {
+      if (error instanceof BadRequestException || error instanceof UnauthorizedException) {
+        throw error;
+      }
+      throw new InternalServerErrorException('Erreur lors de la prévisualisation de la quittance');
+    }
   }
 } 

@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
+import { Injectable, NotFoundException, BadRequestException, InternalServerErrorException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, Between } from 'typeorm';
 import { PaymentSchedule } from '../../entities/payment-schedule.entity';
@@ -57,39 +57,45 @@ export class PaymentScheduleService {
   }
 
   async findAll(): Promise<PaymentSchedule[]> {
-    return this.paymentScheduleRepository.find({
-      relations: [
-        'property',
-        'tenant',
-        'payments',
-        'tenant.rentedProperties',
-        'property.owner'
-      ],
-      select: {
-        tenant: {
-          id: true,
-          firstName: true,
-          lastName: true,
-          email: true,
-          phone: true,
-          address: true,
-          guarantorName: true,
-          guarantorPhone: true
+    try {
+      return this.paymentScheduleRepository.find({
+        relations: {
+          property: {
+            owner: true
+          },
+          tenant: true,
+          payments: true
         },
-        property: {
-          id: true,
-          title: true,
-          address: true,
-          owner: {
+        select: {
+          tenant: {
             id: true,
             firstName: true,
             lastName: true,
             email: true,
-            phone: true
+            phone: true,
+            address: true,
+            guarantorName: true,
+            guarantorPhone: true
+          },
+          property: {
+            id: true,
+            title: true,
+            address: true,
+            owner: {
+              id: true,
+              firstName: true,
+              lastName: true,
+              email: true,
+              phone: true
+            }
           }
         }
-      }
-    });
+      });
+    } catch (error) {
+      throw new InternalServerErrorException(
+        `Erreur lors de la récupération des échéanciers: ${error.message}`
+      );
+    }
   }
 
   async findOne(id: number): Promise<PaymentSchedule> {

@@ -25,14 +25,18 @@ export class PropertyService {
    */
   async create(createPropertyDto: CreatePropertyDto, ownerId: number): Promise<Property> {
     try {
-      const owner = await this.findOwnerById(ownerId);
+      const owner = await this.ownerRepository.findOne({
+        where: { id: ownerId }
+      });
+
+      if (!owner) {
+        throw new NotFoundException(`Propriétaire avec l'ID ${ownerId} non trouvé`);
+      }
       
       // Vérification des images
       if (!createPropertyDto.images || !Array.isArray(createPropertyDto.images)) {
         throw new BadRequestException('Le tableau d\'images est requis');
       }
-
-      console.log('Images à sauvegarder:', createPropertyDto.images); // Pour le débogage
       
       const property = this.propertyRepository.create({
         ...createPropertyDto,
@@ -41,10 +45,13 @@ export class PropertyService {
       });
 
       const savedProperty = await this.propertyRepository.save(property);
-      console.log('Propriété sauvegardée:', savedProperty); // Pour le débogage
-      
-      return savedProperty;
+
+      // Recharger la propriété avec toutes les relations
+      return this.findOne(savedProperty.id);
     } catch (error) {
+      if (error instanceof NotFoundException || error instanceof BadRequestException) {
+        throw error;
+      }
       throw new BadRequestException(`Erreur lors de la création du bien: ${error.message}`);
     }
   }
@@ -70,6 +77,35 @@ export class PropertyService {
   async findAll(): Promise<Property[]> {
     return this.propertyRepository.find({
       relations: ['tenants', 'owner'],
+      select: {
+        id: true,
+        title: true,
+        description: true,
+        price: true,
+        address: true,
+        city: true,
+        zipCode: true,
+        type: true,
+        surface: true,
+        images: true,
+        owner: {
+          id: true,
+          firstName: true,
+          lastName: true,
+          email: true,
+          phone: true
+        },
+        tenants: {
+          id: true,
+          firstName: true,
+          lastName: true,
+          email: true,
+          phone: true,
+          address: true,
+          guarantorName: true,
+          guarantorPhone: true
+        }
+      }
     });
   }
 
@@ -93,7 +129,36 @@ export class PropertyService {
   async findOne(id: number): Promise<Property> {
     const property = await this.propertyRepository.findOne({
       where: { id },
-      relations: ['tenants', 'user'],
+      relations: ['tenants', 'owner'],
+      select: {
+        id: true,
+        title: true,
+        description: true,
+        price: true,
+        address: true,
+        city: true,
+        zipCode: true,
+        type: true,
+        surface: true,
+        images: true,
+        owner: {
+          id: true,
+          firstName: true,
+          lastName: true,
+          email: true,
+          phone: true
+        },
+        tenants: {
+          id: true,
+          firstName: true,
+          lastName: true,
+          email: true,
+          phone: true,
+          address: true,
+          guarantorName: true,
+          guarantorPhone: true
+        }
+      }
     });
 
     if (!property) {
@@ -112,8 +177,33 @@ export class PropertyService {
     return this.propertyRepository
       .createQueryBuilder('property')
       .leftJoinAndSelect('property.tenants', 'tenants')
-      .leftJoinAndSelect('property.user', 'owner')
+      .leftJoinAndSelect('property.owner', 'owner')
       .where('tenants.id = :tenantId', { tenantId })
+      .select([
+        'property.id',
+        'property.title',
+        'property.description',
+        'property.price',
+        'property.address',
+        'property.city',
+        'property.zipCode',
+        'property.type',
+        'property.surface',
+        'property.images',
+        'owner.id',
+        'owner.firstName',
+        'owner.lastName',
+        'owner.email',
+        'owner.phone',
+        'tenants.id',
+        'tenants.firstName',
+        'tenants.lastName',
+        'tenants.email',
+        'tenants.phone',
+        'tenants.address',
+        'tenants.guarantorName',
+        'tenants.guarantorPhone'
+      ])
       .getMany();
   }
 
@@ -129,11 +219,42 @@ export class PropertyService {
   private async findPropertyById(propertyId: number): Promise<Property> {
     const property = await this.propertyRepository.findOne({
       where: { id: propertyId },
-      relations: ['tenants'],
+      relations: ['tenants', 'owner'],
+      select: {
+        id: true,
+        title: true,
+        description: true,
+        price: true,
+        address: true,
+        city: true,
+        zipCode: true,
+        type: true,
+        surface: true,
+        images: true,
+        owner: {
+          id: true,
+          firstName: true,
+          lastName: true,
+          email: true,
+          phone: true
+        },
+        tenants: {
+          id: true,
+          firstName: true,
+          lastName: true,
+          email: true,
+          phone: true,
+          address: true,
+          guarantorName: true,
+          guarantorPhone: true
+        }
+      }
     });
+
     if (!property) {
       throw new NotFoundException(`Propriété avec l'ID ${propertyId} non trouvée`);
     }
+
     return property;
   }
 
