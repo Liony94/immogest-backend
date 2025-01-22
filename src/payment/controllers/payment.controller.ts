@@ -78,4 +78,32 @@ export class PaymentController {
   async updateLateStatus() {
     return this.paymentService.updateLatePaymentsStatus();
   }
+
+  @Put(':id/archive')
+  @Roles('OWNER')
+  @UseGuards(RoleGuard)
+  async archivePayment(@Param('id') id: number) {
+    return this.paymentService.archivePayment(id);
+  }
+
+  @Put(':id/unarchive')
+  @Roles('OWNER')
+  @UseGuards(RoleGuard)
+  async unarchivePayment(@Param('id') id: number) {
+    return this.paymentService.unarchivePayment(id);
+  }
+
+  @Post('archive-multiple')
+  @Roles('OWNER')
+  @UseGuards(RoleGuard)
+  async archiveMultiplePayments(@Body() body: { paymentIds: number[] }) {
+    return this.paymentService.archiveMultiplePayments(body.paymentIds);
+  }
+
+  @Get('archived')
+  @Roles('OWNER')
+  @UseGuards(RoleGuard)
+  async getArchivedPayments() {
+    return this.paymentService.getArchivedPayments();
+  }
 } 

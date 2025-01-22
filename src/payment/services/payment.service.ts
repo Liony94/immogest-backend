@@ -116,4 +116,65 @@ export class PaymentService {
 
     return { updated: result.affected || 0 };
   }
+
+  async archivePayment(paymentId: number): Promise<Payment> {
+    const payment = await this.findOne(paymentId);
+    payment.isArchived = true;
+    return this.paymentRepository.save(payment);
+  }
+
+  async unarchivePayment(paymentId: number): Promise<Payment> {
+    const payment = await this.findOne(paymentId);
+    payment.isArchived = false;
+    return this.paymentRepository.save(payment);
+  }
+
+  async archiveMultiplePayments(paymentIds: number[]): Promise<{ archived: number }> {
+    const result = await this.paymentRepository
+      .createQueryBuilder()
+      .update(Payment)
+      .set({ isArchived: true })
+      .where('id IN (:...ids)', { ids: paymentIds })
+      .execute();
+
+    return { archived: result.affected || 0 };
+  }
+
+  async getArchivedPayments(): Promise<Payment[]> {
+    return this.paymentRepository.find({
+      where: { isArchived: true },
+      relations: [
+        'paymentSchedule',
+        'paymentSchedule.tenant',
+        'paymentSchedule.property',
+        'paymentSchedule.property.owner'
+      ],
+      select: {
+        paymentSchedule: {
+          tenant: {
+            id: true,
+            firstName: true,
+            lastName: true,
+            email: true,
+            phone: true
+          },
+          property: {
+            id: true,
+            title: true,
+            address: true,
+            owner: {
+              id: true,
+              firstName: true,
+              lastName: true,
+              email: true,
+              phone: true
+            }
+          }
+        }
+      },
+      order: {
+        dueDate: 'DESC'
+      }
+    });
+  }
 } 

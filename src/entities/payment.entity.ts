@@ -35,6 +35,9 @@ export class Payment {
   @Column({ nullable: true })
   notes: string;
 
+  @Column({ default: false })
+  isArchived: boolean;
+
   @ManyToOne(() => PaymentSchedule, schedule => schedule.payments, { nullable: false })
   paymentSchedule: PaymentSchedule;
 
