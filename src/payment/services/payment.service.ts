@@ -57,10 +57,14 @@ export class PaymentService {
   }
 
   async findOne(id: number): Promise<Payment> {
-    const payment = await this.paymentRepository.findOne({
-      where: { id },
-      relations: ['paymentSchedule', 'paymentSchedule.tenant', 'paymentSchedule.property']
-    });
+    const payment = await this.paymentRepository
+      .createQueryBuilder('payment')
+      .leftJoinAndSelect('payment.paymentSchedule', 'schedule')
+      .leftJoinAndSelect('schedule.tenant', 'tenant')
+      .leftJoinAndSelect('schedule.property', 'property')
+      .leftJoinAndSelect('property.owner', 'owner')
+      .where('payment.id = :id', { id })
+      .getOne();
 
     if (!payment) {
       throw new NotFoundException(`Paiement #${id} non trouvé`);

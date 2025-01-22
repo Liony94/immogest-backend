@@ -1,4 +1,5 @@
-import { Controller, Post, Body, Param, Get, Put, UseGuards } from '@nestjs/common';
+import { Controller, Post, Body, Param, Get, Put, UseGuards, Res, BadRequestException, InternalServerErrorException, NotFoundException, Query } from '@nestjs/common';
+import { Response } from 'express';
 import { PaymentService } from '../services/payment.service';
 import { PaymentScheduleService } from '../services/payment-schedule.service';
 import { RecordPaymentDto } from '../dto/record-payment.dto';
@@ -6,6 +7,7 @@ import { CreatePaymentScheduleDto } from '../dto/create-payment-schedule.dto';
 import { JwtAuthGuard } from '../../auth/guards/jwt-auth.guard';
 import { RoleGuard } from '../../auth/guards/role.guard';
 import { Roles } from '../../auth/decorators/roles.decorator';
+import { ReceiptService } from '../services/receipt.service';
 
 
 @Controller('payments')
@@ -14,6 +16,7 @@ export class PaymentController {
   constructor(
     private readonly paymentService: PaymentService,
     private readonly paymentScheduleService: PaymentScheduleService,
+    private readonly receiptService: ReceiptService,
   ) {}
 
   @Post('schedules')
@@ -105,5 +108,78 @@ export class PaymentController {
   @UseGuards(RoleGuard)
   async getArchivedPayments() {
     return this.paymentService.getArchivedPayments();
+  }
+
+  @Get(':id/receipt')
+  @Roles('OWNER')
+  @UseGuards(RoleGuard)
+  async generateReceipt(
+    @Param('id') id: number,
+    @Res() res: Response
+  ) {
+    try {
+      const payment = await this.paymentService.findOne(id);
+      
+      if (!payment.paidAt) {
+        throw new BadRequestException('Impossible de générer une quittance pour un paiement non effectué');
+      }
+
+      const pdfBuffer = await this.receiptService.generateReceipt(payment);
+      
+      const month = new Date(payment.dueDate).toLocaleString('fr-FR', { month: 'long', year: 'numeric' });
+      const fileName = `quittance_${month.replace(' ', '_')}.pdf`;
+
+      res.set({
+        'Content-Type': 'application/pdf',
+        'Content-Disposition': `attachment; filename="${fileName}"`,
+        'Content-Length': pdfBuffer.length,
+      });
+
+      res.end(pdfBuffer);
+    } catch (error) {
+      if (error instanceof BadRequestException) {
+        throw error;
+      }
+      throw new InternalServerErrorException('Erreur lors de la génération de la quittance');
+    }
+  }
+
+  @Get('receipts')
+  @Roles('OWNER')
+  @UseGuards(RoleGuard)
+  async getAllReceipts(
+    @Query('propertyId') propertyId?: number,
+    @Query('tenantId') tenantId?: number,
+    @Query('ownerId') ownerId?: number
+  ) {
+    return this.receiptService.getAllReceipts(propertyId, tenantId, ownerId);
+  }
+
+  @Get('receipts/property/:propertyId')
+  @Roles('OWNER')
+  @UseGuards(RoleGuard)
+  async getReceiptsByProperty(@Param('propertyId') propertyId: number) {
+    return this.receiptService.getReceiptsByProperty(propertyId);
+  }
+
+  @Get('receipts/tenant/:tenantId')
+  @Roles('OWNER')
+  @UseGuards(RoleGuard)
+  async getReceiptsByTenant(@Param('tenantId') tenantId: number) {
+    return this.receiptService.getReceiptsByTenant(tenantId);
+  }
+
+  @Get('receipts/owner/:ownerId')
+  @Roles('OWNER')
+  @UseGuards(RoleGuard)
+  async getReceiptsByOwner(@Param('ownerId') ownerId: number) {
+    return this.receiptService.getReceiptsByOwner(ownerId);
+  }
+
+  @Get(':id/receipts')
+  @Roles('OWNER')
+  @UseGuards(RoleGuard)
+  async getReceiptsByPayment(@Param('id') paymentId: number) {
+    return this.receiptService.getReceiptsByPayment(paymentId);
   }
 } 
