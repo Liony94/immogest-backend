@@ -1,22 +1,43 @@
 import { NestFactory } from '@nestjs/core';
 import { AppModule } from './app.module';
-import { join } from 'path';
+import { ValidationPipe } from '@nestjs/common';
 import { NestExpressApplication } from '@nestjs/platform-express';
+import { join } from 'path';
+import * as fs from 'fs';
 
 async function bootstrap() {
-  const app = await NestFactory.create<NestExpressApplication>(AppModule);
-  app.enableCors({
-    origin: ['http://localhost:3000', 'http://localhost:3001'],
-    credentials: true,
-    methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS', 'PATCH'],
-    allowedHeaders: ['Content-Type', 'Authorization'],
-    exposedHeaders: ['Content-Disposition'],
+  // Création des dossiers d'upload s'ils n'existent pas
+  const uploadDirs = [
+    './uploads',
+    './uploads/properties',
+    './uploads/properties/images',
+    './uploads/properties/documents'
+  ];
+
+  uploadDirs.forEach(dir => {
+    if (!fs.existsSync(dir)) {
+      fs.mkdirSync(dir, { recursive: true });
+    }
   });
 
-   app.useStaticAssets(join(__dirname, '..', 'uploads'), {
+  const app = await NestFactory.create<NestExpressApplication>(AppModule);
+  
+  // Configuration CORS
+  app.enableCors();
+  
+  // Configuration de la validation
+  app.useGlobalPipes(new ValidationPipe({
+    transform: true,
+    whitelist: true,
+    forbidNonWhitelisted: false,
+    forbidUnknownValues: false,
+  }));
+
+  // Configuration des fichiers statiques
+  app.useStaticAssets(join(__dirname, '..', 'uploads'), {
     prefix: '/uploads/',
   });
-  
+
   app.setGlobalPrefix('api');
   await app.listen(3001);
 }

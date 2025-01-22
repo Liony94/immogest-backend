@@ -164,8 +164,12 @@ export class PaymentService {
           },
           property: {
             id: true,
-            title: true,
+            identifier: true,
             address: true,
+            city: true,
+            zipCode: true,
+            type: true,
+            surface: true,
             owner: {
               id: true,
               firstName: true,

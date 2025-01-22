@@ -79,8 +79,12 @@ export class PaymentScheduleService {
           },
           property: {
             id: true,
-            title: true,
+            identifier: true,
             address: true,
+            city: true,
+            zipCode: true,
+            type: true,
+            surface: true,
             owner: {
               id: true,
               firstName: true,
@@ -121,8 +125,12 @@ export class PaymentScheduleService {
         },
         property: {
           id: true,
-          title: true,
+          identifier: true,
           address: true,
+          city: true,
+          zipCode: true,
+          type: true,
+          surface: true,
           owner: {
             id: true,
             firstName: true,
@@ -152,8 +160,12 @@ export class PaymentScheduleService {
       select: {
         property: {
           id: true,
-          title: true,
+          identifier: true,
           address: true,
+          city: true,
+          zipCode: true,
+          type: true,
+          surface: true,
           owner: {
             id: true,
             firstName: true,
@@ -213,8 +225,12 @@ export class PaymentScheduleService {
           },
           property: {
             id: true,
-            title: true,
+            identifier: true,
             address: true,
+            city: true,
+            zipCode: true,
+            type: true,
+            surface: true,
             owner: {
               id: true,
               firstName: true,

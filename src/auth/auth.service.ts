@@ -8,6 +8,7 @@ import { UserRole } from '../common/types';
 import * as bcrypt from 'bcrypt';
 import { JwtService } from '@nestjs/jwt';
 import { LoginDto } from './dto/login.dto';
+import { UserService } from '../user/user.service';
 
 @Injectable()
 export class AuthService {
@@ -17,6 +18,7 @@ export class AuthService {
     @InjectRepository(Tenant)
     private tenantRepository: Repository<Tenant>,
     private readonly jwtService: JwtService,
+    private readonly userService: UserService,
   ) { }
 
   private async checkEmailExists(email: string): Promise<boolean> {
@@ -96,11 +98,26 @@ export class AuthService {
     }
   }
 
-  async login(user: Owner | Tenant) {
-    const payload = {
-      email: user.email,
+  async login(loginDto: LoginDto) {
+    const user = await this.userService.findByEmail(loginDto.email);
+    if (!user) {
+      throw new UnauthorizedException('Email ou mot de passe incorrect');
+    }
+
+    // Vérifier si le rôle correspond
+    if (user.role !== loginDto.role) {
+      throw new UnauthorizedException('Type d\'utilisateur incorrect');
+    }
+
+    const isPasswordValid = await bcrypt.compare(loginDto.password, user.password);
+    if (!isPasswordValid) {
+      throw new UnauthorizedException('Email ou mot de passe incorrect');
+    }
+
+    const payload = { 
       sub: user.id,
-      role: user instanceof Owner ? UserRole.OWNER : UserRole.TENANT
+      email: user.email,
+      role: user.role
     };
 
     return {
@@ -108,7 +125,9 @@ export class AuthService {
       user: {
         id: user.id,
         email: user.email,
-        role: user instanceof Owner ? UserRole.OWNER : UserRole.TENANT
+        role: user.role,
+        firstName: user.firstName,
+        lastName: user.lastName
       }
     };
   }

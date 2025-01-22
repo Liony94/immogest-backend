@@ -5,6 +5,16 @@ import { Property } from '../entities/property.entity';
 import { CreatePropertyDto } from './dto/create-property.dto';
 import { Owner } from '../entities/owner.entity';
 import { Tenant } from '../entities/tenant.entity';
+import { PropertyAccess } from '../entities/property-access.entity';
+import { PropertyDocument } from '../entities/property-document.entity';
+import { UpdatePropertyAccessDto } from './dto/update-property-access.dto';
+import { UpdatePropertyDocumentDto } from './dto/update-property-document.dto';
+import { CreatePropertyAccessDto } from './dto/create-property-access.dto';
+import { CreatePropertyDocumentDto } from './dto/create-property-document.dto';
+import * as fs from 'fs';
+import { promisify } from 'util';
+
+const unlinkAsync = promisify(fs.unlink);
 
 @Injectable()
 export class PropertyService {
@@ -15,6 +25,10 @@ export class PropertyService {
     private readonly ownerRepository: Repository<Owner>,
     @InjectRepository(Tenant)
     private readonly tenantRepository: Repository<Tenant>,
+    @InjectRepository(PropertyAccess)
+    private readonly propertyAccessRepository: Repository<PropertyAccess>,
+    @InjectRepository(PropertyDocument)
+    private readonly propertyDocumentRepository: Repository<PropertyDocument>,
   ) {}
 
   /**
@@ -32,21 +46,22 @@ export class PropertyService {
       if (!owner) {
         throw new NotFoundException(`Propriétaire avec l'ID ${ownerId} non trouvé`);
       }
-      
-      // Vérification des images
-      if (!createPropertyDto.images || !Array.isArray(createPropertyDto.images)) {
-        throw new BadRequestException('Le tableau d\'images est requis');
+
+      // Vérification de l'identifiant unique
+      const existingProperty = await this.propertyRepository.findOne({
+        where: { identifier: createPropertyDto.identifier }
+      });
+
+      if (existingProperty) {
+        throw new BadRequestException(`Une propriété avec l'identifiant ${createPropertyDto.identifier} existe déjà`);
       }
       
       const property = this.propertyRepository.create({
         ...createPropertyDto,
         owner,
-        images: createPropertyDto.images,
       });
 
       const savedProperty = await this.propertyRepository.save(property);
-
-      // Recharger la propriété avec toutes les relations
       return this.findOne(savedProperty.id);
     } catch (error) {
       if (error instanceof NotFoundException || error instanceof BadRequestException) {
@@ -76,36 +91,12 @@ export class PropertyService {
    */
   async findAll(): Promise<Property[]> {
     return this.propertyRepository.find({
-      relations: ['tenants', 'owner'],
-      select: {
-        id: true,
-        title: true,
-        description: true,
-        price: true,
-        address: true,
-        city: true,
-        zipCode: true,
-        type: true,
-        surface: true,
-        images: true,
-        owner: {
-          id: true,
-          firstName: true,
-          lastName: true,
-          email: true,
-          phone: true
-        },
-        tenants: {
-          id: true,
-          firstName: true,
-          lastName: true,
-          email: true,
-          phone: true,
-          address: true,
-          guarantorName: true,
-          guarantorPhone: true
-        }
-      }
+      relations: [
+        'tenants',
+        'owner',
+        'accesses',
+        'documents'
+      ]
     });
   }
 
@@ -117,7 +108,12 @@ export class PropertyService {
   async findPropertiesByOwner(ownerId: number): Promise<Property[]> {
     return this.propertyRepository.find({
       where: { owner: { id: ownerId } },
-      relations: ['tenants', 'owner'],
+      relations: [
+        'tenants',
+        'owner',
+        'accesses',
+        'documents'
+      ],
     });
   }
 
@@ -129,36 +125,12 @@ export class PropertyService {
   async findOne(id: number): Promise<Property> {
     const property = await this.propertyRepository.findOne({
       where: { id },
-      relations: ['tenants', 'owner'],
-      select: {
-        id: true,
-        title: true,
-        description: true,
-        price: true,
-        address: true,
-        city: true,
-        zipCode: true,
-        type: true,
-        surface: true,
-        images: true,
-        owner: {
-          id: true,
-          firstName: true,
-          lastName: true,
-          email: true,
-          phone: true
-        },
-        tenants: {
-          id: true,
-          firstName: true,
-          lastName: true,
-          email: true,
-          phone: true,
-          address: true,
-          guarantorName: true,
-          guarantorPhone: true
-        }
-      }
+      relations: [
+        'tenants',
+        'owner',
+        'accesses',
+        'documents'
+      ]
     });
 
     if (!property) {
@@ -178,33 +150,135 @@ export class PropertyService {
       .createQueryBuilder('property')
       .leftJoinAndSelect('property.tenants', 'tenants')
       .leftJoinAndSelect('property.owner', 'owner')
+      .leftJoinAndSelect('property.accesses', 'accesses')
+      .leftJoinAndSelect('property.documents', 'documents')
       .where('tenants.id = :tenantId', { tenantId })
-      .select([
-        'property.id',
-        'property.title',
-        'property.description',
-        'property.price',
-        'property.address',
-        'property.city',
-        'property.zipCode',
-        'property.type',
-        'property.surface',
-        'property.images',
-        'owner.id',
-        'owner.firstName',
-        'owner.lastName',
-        'owner.email',
-        'owner.phone',
-        'tenants.id',
-        'tenants.firstName',
-        'tenants.lastName',
-        'tenants.email',
-        'tenants.phone',
-        'tenants.address',
-        'tenants.guarantorName',
-        'tenants.guarantorPhone'
-      ])
       .getMany();
+  }
+
+  // Méthodes pour les accès
+  async addAccess(propertyId: number, accessData: CreatePropertyAccessDto): Promise<PropertyAccess> {
+    const property = await this.findOne(propertyId);
+    const access = this.propertyAccessRepository.create({
+      ...accessData,
+      property
+    });
+    return this.propertyAccessRepository.save(access);
+  }
+
+  async updateAccess(accessId: number, updateAccessDto: UpdatePropertyAccessDto): Promise<PropertyAccess> {
+    const access = await this.propertyAccessRepository.findOne({
+      where: { id: accessId },
+      relations: ['property']
+    });
+
+    if (!access) {
+      throw new NotFoundException(`Accès avec l'ID ${accessId} non trouvé`);
+    }
+
+    Object.assign(access, updateAccessDto);
+    return this.propertyAccessRepository.save(access);
+  }
+
+  async deleteAccess(accessId: number): Promise<void> {
+    const access = await this.propertyAccessRepository.findOne({
+      where: { id: accessId }
+    });
+
+    if (!access) {
+      throw new NotFoundException(`Accès avec l'ID ${accessId} non trouvé`);
+    }
+
+    await this.propertyAccessRepository.remove(access);
+  }
+
+  // Méthodes pour les documents
+  async addDocument(propertyId: number, documentData: CreatePropertyDocumentDto & { fileName: string; fileUrl: string }): Promise<PropertyDocument> {
+    const property = await this.findOne(propertyId);
+    const document = this.propertyDocumentRepository.create({
+      ...documentData,
+      property
+    });
+    return this.propertyDocumentRepository.save(document);
+  }
+
+  async updateDocument(documentId: number, updateDocumentDto: UpdatePropertyDocumentDto): Promise<PropertyDocument> {
+    const document = await this.propertyDocumentRepository.findOne({
+      where: { id: documentId },
+      relations: ['property']
+    });
+
+    if (!document) {
+      throw new NotFoundException(`Document avec l'ID ${documentId} non trouvé`);
+    }
+
+    Object.assign(document, updateDocumentDto);
+    return this.propertyDocumentRepository.save(document);
+  }
+
+  async deleteDocument(documentId: number): Promise<void> {
+    const document = await this.propertyDocumentRepository.findOne({
+      where: { id: documentId }
+    });
+
+    if (!document) {
+      throw new NotFoundException(`Document avec l'ID ${documentId} non trouvé`);
+    }
+
+    // Supprimer le fichier physique
+    try {
+      const filePath = `.${document.fileUrl}`;
+      await unlinkAsync(filePath);
+    } catch (error) {
+      console.error(`Erreur lors de la suppression du fichier: ${error.message}`);
+    }
+
+    await this.propertyDocumentRepository.remove(document);
+  }
+
+  async updateDocumentFile(documentId: number, fileName: string, fileUrl: string): Promise<PropertyDocument> {
+    const document = await this.propertyDocumentRepository.findOne({
+      where: { id: documentId }
+    });
+
+    if (!document) {
+      throw new NotFoundException(`Document avec l'ID ${documentId} non trouvé`);
+    }
+
+    // Supprimer l'ancien fichier
+    try {
+      const oldFilePath = `.${document.fileUrl}`;
+      await unlinkAsync(oldFilePath);
+    } catch (error) {
+      console.error(`Erreur lors de la suppression de l'ancien fichier: ${error.message}`);
+    }
+
+    // Mettre à jour avec le nouveau fichier
+    document.fileName = fileName;
+    document.fileUrl = fileUrl;
+    return this.propertyDocumentRepository.save(document);
+  }
+
+  async findAccessWithRelations(accessId: number): Promise<PropertyAccess> {
+    const access = await this.propertyAccessRepository.findOne({
+      where: { id: accessId },
+      relations: ['property', 'property.owner']
+    });
+    if (!access) {
+      throw new NotFoundException(`Accès avec l'ID ${accessId} non trouvé`);
+    }
+    return access;
+  }
+
+  async findDocumentWithRelations(documentId: number): Promise<PropertyDocument> {
+    const document = await this.propertyDocumentRepository.findOne({
+      where: { id: documentId },
+      relations: ['property', 'property.owner']
+    });
+    if (!document) {
+      throw new NotFoundException(`Document avec l'ID ${documentId} non trouvé`);
+    }
+    return document;
   }
 
   // Méthodes privées utilitaires
@@ -219,36 +293,7 @@ export class PropertyService {
   private async findPropertyById(propertyId: number): Promise<Property> {
     const property = await this.propertyRepository.findOne({
       where: { id: propertyId },
-      relations: ['tenants', 'owner'],
-      select: {
-        id: true,
-        title: true,
-        description: true,
-        price: true,
-        address: true,
-        city: true,
-        zipCode: true,
-        type: true,
-        surface: true,
-        images: true,
-        owner: {
-          id: true,
-          firstName: true,
-          lastName: true,
-          email: true,
-          phone: true
-        },
-        tenants: {
-          id: true,
-          firstName: true,
-          lastName: true,
-          email: true,
-          phone: true,
-          address: true,
-          guarantorName: true,
-          guarantorPhone: true
-        }
-      }
+      relations: ['tenants', 'owner', 'accesses', 'documents']
     });
 
     if (!property) {

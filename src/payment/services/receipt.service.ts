@@ -79,7 +79,7 @@ export class ReceiptService {
            .moveDown(0.5);
         doc.fontSize(10)
            .text([
-             payment.paymentSchedule.property.title,
+             `${payment.paymentSchedule.property.identifier},`,
              payment.paymentSchedule.property.address
            ].join('\n'))
            .moveDown(1.5);

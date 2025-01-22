@@ -10,5 +10,6 @@ export default registerAs('database', (): TypeOrmModuleOptions => ({
   database: process.env.DATABASE_NAME,
   autoLoadEntities: true,
   synchronize: process.env.NODE_ENV !== 'production',
+  dropSchema: true,
   logging: process.env.NODE_ENV !== 'production',
 }));
