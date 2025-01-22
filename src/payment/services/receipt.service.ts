@@ -14,9 +14,7 @@ export class ReceiptService {
     private receiptRepository: Repository<Receipt>,
   ) {}
 
-  async generateReceipt(payment: Payment): Promise<Buffer> {
-    this.logger.debug(`Génération de quittance pour le paiement #${payment.id}`);
-
+  private async generatePDFBuffer(payment: Payment): Promise<{ buffer: Buffer; fileName: string }> {
     return new Promise((resolve, reject) => {
       try {
         const doc = new PDFDocument({
@@ -31,31 +29,13 @@ export class ReceiptService {
 
         const buffers: Buffer[] = [];
         doc.on('data', chunk => buffers.push(chunk));
-        doc.on('end', async () => {
+        doc.on('end', () => {
           const pdfBuffer = Buffer.concat(buffers);
-          
-          // Créer le nom du fichier
           const dueDate = new Date(payment.dueDate);
           const month = dueDate.toLocaleString('fr-FR', { month: 'long' });
           const year = dueDate.getFullYear();
           const fileName = `quittance_${month}_${year}.pdf`;
-
-          // Sauvegarder la quittance en base de données
-          const receipt = this.receiptRepository.create({
-            pdfContent: pdfBuffer,
-            fileName,
-            month,
-            year,
-            payment,
-            property: payment.paymentSchedule.property,
-            owner: payment.paymentSchedule.property.owner,
-            tenant: payment.paymentSchedule.tenant,
-            amount: payment.amount,
-            paymentDate: payment.paidAt
-          });
-
-          await this.receiptRepository.save(receipt);
-          resolve(pdfBuffer);
+          resolve({ buffer: pdfBuffer, fileName });
         });
         doc.on('error', reject);
 
@@ -146,14 +126,50 @@ export class ReceiptService {
              align: 'center'
            });
 
-        // Finaliser le document
         doc.end();
-
       } catch (error) {
         this.logger.error('Erreur lors de la génération du PDF:', error);
         reject(error);
       }
     });
+  }
+
+  async previewReceipt(payment: Payment): Promise<Buffer> {
+    this.logger.debug(`Prévisualisation de quittance pour le paiement #${payment.id}`);
+    const { buffer } = await this.generatePDFBuffer(payment);
+    return buffer;
+  }
+
+  async generateAndSaveReceipt(payment: Payment): Promise<Buffer> {
+    this.logger.debug(`Génération et sauvegarde de quittance pour le paiement #${payment.id}`);
+    
+    // Vérifier si une quittance existe déjà pour ce paiement
+    const existingReceipt = await this.receiptRepository.findOne({
+      where: { payment: { id: payment.id } }
+    });
+
+    if (existingReceipt) {
+      return existingReceipt.pdfContent;
+    }
+
+    const { buffer, fileName } = await this.generatePDFBuffer(payment);
+    const dueDate = new Date(payment.dueDate);
+    
+    const receipt = this.receiptRepository.create({
+      pdfContent: buffer,
+      fileName,
+      month: dueDate.toLocaleString('fr-FR', { month: 'long' }),
+      year: dueDate.getFullYear(),
+      payment,
+      property: payment.paymentSchedule.property,
+      owner: payment.paymentSchedule.property.owner,
+      tenant: payment.paymentSchedule.tenant,
+      amount: payment.amount,
+      paymentDate: payment.paidAt
+    });
+
+    await this.receiptRepository.save(receipt);
+    return buffer;
   }
 
   async getReceipt(id: number): Promise<Receipt> {

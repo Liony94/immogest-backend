@@ -110,6 +110,40 @@ export class PaymentController {
     return this.paymentService.getArchivedPayments();
   }
 
+  @Get(':id/receipt/preview')
+  @Roles('OWNER')
+  @UseGuards(RoleGuard)
+  async previewReceipt(
+    @Param('id') id: number,
+    @Res() res: Response
+  ) {
+    try {
+      const payment = await this.paymentService.findOne(id);
+      
+      if (!payment.paidAt) {
+        throw new BadRequestException('Impossible de générer une quittance pour un paiement non effectué');
+      }
+
+      const pdfBuffer = await this.receiptService.previewReceipt(payment);
+      
+      const month = new Date(payment.dueDate).toLocaleString('fr-FR', { month: 'long', year: 'numeric' });
+      const fileName = `quittance_${month.replace(' ', '_')}_preview.pdf`;
+
+      res.set({
+        'Content-Type': 'application/pdf',
+        'Content-Disposition': `inline; filename="${fileName}"`,
+        'Content-Length': pdfBuffer.length,
+      });
+
+      res.end(pdfBuffer);
+    } catch (error) {
+      if (error instanceof BadRequestException) {
+        throw error;
+      }
+      throw new InternalServerErrorException('Erreur lors de la prévisualisation de la quittance');
+    }
+  }
+
   @Get(':id/receipt')
   @Roles('OWNER')
   @UseGuards(RoleGuard)
@@ -124,7 +158,7 @@ export class PaymentController {
         throw new BadRequestException('Impossible de générer une quittance pour un paiement non effectué');
       }
 
-      const pdfBuffer = await this.receiptService.generateReceipt(payment);
+      const pdfBuffer = await this.receiptService.generateAndSaveReceipt(payment);
       
       const month = new Date(payment.dueDate).toLocaleString('fr-FR', { month: 'long', year: 'numeric' });
       const fileName = `quittance_${month.replace(' ', '_')}.pdf`;
