@@ -14,7 +14,6 @@ import {
   BadRequestException,
   UnauthorizedException,
   UploadedFile,
-  NotFoundException,
 } from '@nestjs/common';
 import { PropertyService } from './property.service';
 import { CreatePropertyDto } from './dto/create-property.dto';
@@ -26,150 +25,42 @@ import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RoleGuard } from '../auth/guards/role.guard';
 import { Roles } from '../auth/decorators/roles.decorator';
 import { FilesInterceptor, FileInterceptor } from '@nestjs/platform-express';
-import { extname } from 'path';
-import { diskStorage } from 'multer';
 import { AddTenantsDto } from './dto/add-tenants.dto';
-
-const UPLOAD_CONFIG = {
-  images: {
-    destination: './uploads/properties/images',
-    maxFiles: 10,
-    maxFileSize: 10 * 1024 * 1024, // 10MB
-    allowedExtensions: /(jpg|jpeg|png|gif)$/,
-  },
-  documents: {
-    destination: './uploads/properties/documents',
-    maxFileSize: 15 * 1024 * 1024, // 15MB
-    allowedExtensions: /(pdf|doc|docx|xls|xlsx|jpg|jpeg|png|gif)$/,
-  }
-};
-
-const imageStorage = diskStorage({
-  destination: UPLOAD_CONFIG.images.destination,
-  filename: (req, file, callback) => {
-    const uniqueSuffix = `${Date.now()}-${Math.round(Math.random() * 1E9)}`;
-    callback(null, `${uniqueSuffix}${extname(file.originalname)}`);
-  },
-});
-
-const documentStorage = diskStorage({
-  destination: UPLOAD_CONFIG.documents.destination,
-  filename: (req, file, callback) => {
-    const uniqueSuffix = `${Date.now()}-${Math.round(Math.random() * 1E9)}`;
-    callback(null, `${uniqueSuffix}${extname(file.originalname)}`);
-  },
-});
-
-const imageFileFilter = (req: any, file: Express.Multer.File, callback: Function) => {
-  if (!file.originalname.toLowerCase().match(UPLOAD_CONFIG.images.allowedExtensions)) {
-    return callback(new BadRequestException('Seuls les fichiers image sont autorisés!'), false);
-  }
-  callback(null, true);
-};
-
-const documentFileFilter = (req: any, file: Express.Multer.File, callback: Function) => {
-  if (!file.originalname.toLowerCase().match(UPLOAD_CONFIG.documents.allowedExtensions)) {
-    return callback(new BadRequestException('Format de fichier non autorisé!'), false);
-  }
-  callback(null, true);
-};
+import { UPLOAD_CONFIG } from '../config/upload.config';
+import { 
+  imageInterceptorOptions, 
+  documentInterceptorOptions 
+} from '../interceptors/file.interceptor';
 
 @Controller('properties')
 @UseGuards(JwtAuthGuard)
 export class PropertyController {
   constructor(private readonly propertyService: PropertyService) {}
 
+  // Vérification des autorisations
+  private async checkPropertyOwnership(propertyId: number, userId: number): Promise<void> {
+    const property = await this.propertyService.findOne(propertyId);
+    if (property.owner.id !== userId) {
+      throw new UnauthorizedException('Vous n\'êtes pas autorisé à modifier cette propriété');
+    }
+  }
+
+  // Endpoints de gestion des propriétés
   @Post()
   @Roles('OWNER')
   @UseGuards(RoleGuard)
   @UseInterceptors(
-    FilesInterceptor('images', UPLOAD_CONFIG.images.maxFiles, {
-      storage: imageStorage,
-      fileFilter: imageFileFilter,
-      limits: {
-        fileSize: UPLOAD_CONFIG.images.maxFileSize,
-      },
-    }),
+    FilesInterceptor('images', UPLOAD_CONFIG.images.maxFiles, imageInterceptorOptions),
   )
   async create(
     @UploadedFiles() files: Express.Multer.File[],
     @Body() createPropertyDto: CreatePropertyDto,
     @Request() req,
   ) {
-    if (files && files.length > 0) {
-      const imagePaths = files.map(file => `/uploads/properties/images/${file.filename}`);
-      createPropertyDto.images = imagePaths;
+    if (files?.length > 0) {
+      createPropertyDto.images = files.map(file => `/uploads/properties/images/${file.filename}`);
     }
-
     return this.propertyService.create(createPropertyDto, req.user.id);
-  }
-
-  // Endpoints pour les accès
-  @Post(':id/access')
-  @Roles('OWNER')
-  @UseGuards(RoleGuard)
-  async addAccess(
-    @Param('id', ParseIntPipe) id: number,
-    @Body() createAccessDto: CreatePropertyAccessDto,
-    @Request() req,
-  ) {
-    const property = await this.propertyService.findOne(id);
-    if (property.owner.id !== req.user.id) {
-      throw new UnauthorizedException('Vous n\'êtes pas autorisé à modifier cette propriété');
-    }
-    return this.propertyService.addAccess(id, createAccessDto);
-  }
-
-  // Endpoints pour les documents
-  @Post(':id/document')
-  @Roles('OWNER')
-  @UseGuards(RoleGuard)
-  @UseInterceptors(
-    FileInterceptor('file', {
-      storage: documentStorage,
-      fileFilter: documentFileFilter,
-      limits: {
-        fileSize: UPLOAD_CONFIG.documents.maxFileSize,
-      },
-    }),
-  )
-  async addDocument(
-    @Param('id', ParseIntPipe) id: number,
-    @UploadedFile() file: Express.Multer.File,
-    @Body() createDocumentDto: CreatePropertyDocumentDto,
-    @Request() req,
-  ) {
-    const property = await this.propertyService.findOne(id);
-    if (property.owner.id !== req.user.id) {
-      throw new UnauthorizedException('Vous n\'êtes pas autorisé à modifier cette propriété');
-    }
-
-    if (!file) {
-      throw new BadRequestException('Le fichier est requis');
-    }
-
-    const documentData = {
-      ...createDocumentDto,
-      fileName: file.filename,
-      fileUrl: `/uploads/properties/documents/${file.filename}`,
-    };
-
-    return this.propertyService.addDocument(id, documentData);
-  }
-
-  @Post(':id/tenants')
-  @Roles('OWNER')
-  @UseGuards(RoleGuard)
-  async addTenants(
-    @Param('id', ParseIntPipe) id: number,
-    @Body() addTenantsDto: AddTenantsDto,
-    @Request() req,
-  ) {
-    const property = await this.propertyService.findOne(id);
-    if (property.owner.id !== req.user.id) {
-      throw new UnauthorizedException('Vous n\'êtes pas autorisé à modifier cette propriété');
-    }
-    return this.propertyService.addTenants(id, addTenantsDto.tenantIds);
   }
 
   @Get('owner')
@@ -201,7 +92,19 @@ export class PropertyController {
     return properties.filter(property => property.owner.id === req.user.id);
   }
 
-  // Endpoints pour les accès
+  // Endpoints de gestion des accès
+  @Post(':id/access')
+  @Roles('OWNER')
+  @UseGuards(RoleGuard)
+  async addAccess(
+    @Param('id', ParseIntPipe) id: number,
+    @Body() createAccessDto: CreatePropertyAccessDto,
+    @Request() req,
+  ) {
+    await this.checkPropertyOwnership(id, req.user.id);
+    return this.propertyService.addAccess(id, createAccessDto);
+  }
+
   @Put('access/:id')
   @Roles('OWNER')
   @UseGuards(RoleGuard)
@@ -232,7 +135,32 @@ export class PropertyController {
     return { message: 'Accès supprimé avec succès' };
   }
 
-  // Endpoints pour les documents
+  // Endpoints de gestion des documents
+  @Post(':id/document')
+  @Roles('OWNER')
+  @UseGuards(RoleGuard)
+  @UseInterceptors(FileInterceptor('file', documentInterceptorOptions))
+  async addDocument(
+    @Param('id', ParseIntPipe) id: number,
+    @UploadedFile() file: Express.Multer.File,
+    @Body() createDocumentDto: CreatePropertyDocumentDto,
+    @Request() req,
+  ) {
+    await this.checkPropertyOwnership(id, req.user.id);
+
+    if (!file) {
+      throw new BadRequestException('Le fichier est requis');
+    }
+
+    const documentData = {
+      ...createDocumentDto,
+      fileName: file.filename,
+      fileUrl: `/uploads/properties/documents/${file.filename}`,
+    };
+
+    return this.propertyService.addDocument(id, documentData);
+  }
+
   @Put('document/:id')
   @Roles('OWNER')
   @UseGuards(RoleGuard)
@@ -251,15 +179,7 @@ export class PropertyController {
   @Put('document/:id/file')
   @Roles('OWNER')
   @UseGuards(RoleGuard)
-  @UseInterceptors(
-    FileInterceptor('file', {
-      storage: documentStorage,
-      fileFilter: documentFileFilter,
-      limits: {
-        fileSize: UPLOAD_CONFIG.documents.maxFileSize,
-      },
-    }),
-  )
+  @UseInterceptors(FileInterceptor('file', documentInterceptorOptions))
   async updateDocumentFile(
     @Param('id', ParseIntPipe) id: number,
     @UploadedFile() file: Express.Multer.File,
@@ -292,5 +212,18 @@ export class PropertyController {
     }
     await this.propertyService.deleteDocument(id);
     return { message: 'Document supprimé avec succès' };
+  }
+
+  // Endpoints de gestion des locataires
+  @Post(':id/tenants')
+  @Roles('OWNER')
+  @UseGuards(RoleGuard)
+  async addTenants(
+    @Param('id', ParseIntPipe) id: number,
+    @Body() addTenantsDto: AddTenantsDto,
+    @Request() req,
+  ) {
+    await this.checkPropertyOwnership(id, req.user.id);
+    return this.propertyService.addTenants(id, addTenantsDto.tenantIds);
   }
 }
