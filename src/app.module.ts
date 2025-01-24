@@ -1,20 +1,19 @@
 import { Module } from '@nestjs/common';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
-import { AuthModule } from './auth/auth.module';
+import { AuthModule } from './modules/auth/auth.module';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { User } from './entities/user.entity';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import databaseConfig from './config/database.config';
 import { Property } from './entities/property.entity';
-import { UserModule } from './user/user.module';
-import { PropertyModule } from './property/property.module';
+import { PropertyModule } from './modules/property/property.module';
 import { Owner } from './entities/owner.entity';
 import { Tenant } from './entities/tenant.entity';
-import { PaymentModule } from './payment/payment.module';
 import { Payment } from './entities/payment.entity';
 import { PaymentSchedule } from './entities/payment-schedule.entity';
-
+import { UserModule } from './modules/user/user.module';
+import { PaymentModule } from './modules/payment/payment.module';
 @Module({
   imports: [
     ConfigModule.forRoot({
