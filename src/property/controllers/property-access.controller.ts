@@ -11,25 +11,20 @@ import {
   UnauthorizedException,
 } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiResponse } from '@nestjs/swagger';
-import { PropertyService } from '../property.service';
+import { PropertyBaseService } from '../services/property-base.service';
 import { CreatePropertyAccessDto } from '../dto/create-property-access.dto';
 import { UpdatePropertyAccessDto } from '../dto/update-property-access.dto';
 import { JwtAuthGuard } from '../../auth/guards/jwt-auth.guard';
 import { RoleGuard } from '../../auth/guards/role.guard';
 import { Roles } from '../../auth/decorators/roles.decorator';
+import { PropertyAccessService } from '../services/property-access.service';
+import { PropertyOwnershipService } from '../services/property-ownership.service';
 
 @ApiTags('Accès aux propriétés')
 @Controller('properties')
 @UseGuards(JwtAuthGuard)
 export class PropertyAccessController {
-  constructor(private readonly propertyService: PropertyService) {}
-
-  private async checkPropertyOwnership(propertyId: number, userId: number): Promise<void> {
-    const property = await this.propertyService.findOne(propertyId);
-    if (property.owner.id !== userId) {
-      throw new UnauthorizedException('Vous n\'êtes pas autorisé à modifier cette propriété');
-    }
-  }
+  constructor(private readonly propertyBaseService: PropertyBaseService, private readonly propertyAccessService: PropertyAccessService, private readonly propertyOwnershipService: PropertyOwnershipService) {}
 
   @Post(':id/access')
   @ApiOperation({ summary: 'Ajouter un accès à une propriété' })
@@ -42,8 +37,8 @@ export class PropertyAccessController {
     @Body() createAccessDto: CreatePropertyAccessDto,
     @Request() req,
   ) {
-    await this.checkPropertyOwnership(id, req.user.id);
-    return this.propertyService.addAccess(id, createAccessDto);
+    await this.propertyOwnershipService.checkPropertyOwnership(id, req.user.id);
+    return this.propertyAccessService.addAccess(id, createAccessDto);
   }
 
   @Put('access/:id')
@@ -57,11 +52,11 @@ export class PropertyAccessController {
     @Body() updateAccessDto: UpdatePropertyAccessDto,
     @Request() req,
   ) {
-    const access = await this.propertyService.findAccessWithRelations(id);
+    const access = await this.propertyAccessService.findAccessWithRelations(id);
     if (access.property.owner.id !== req.user.id) {
       throw new UnauthorizedException('Vous n\'êtes pas autorisé à modifier cet accès');
     }
-    return this.propertyService.updateAccess(id, updateAccessDto);
+    return this.propertyAccessService.updateAccess(id, updateAccessDto);
   }
 
   @Delete('access/:id')
@@ -74,11 +69,11 @@ export class PropertyAccessController {
     @Param('id', ParseIntPipe) id: number,
     @Request() req,
   ) {
-    const access = await this.propertyService.findAccessWithRelations(id);
+    const access = await this.propertyAccessService.findAccessWithRelations(id);
     if (access.property.owner.id !== req.user.id) {
       throw new UnauthorizedException('Vous n\'êtes pas autorisé à supprimer cet accès');
     }
-    await this.propertyService.deleteAccess(id);
+    await this.propertyAccessService.deleteAccess(id);
     return { message: 'Accès supprimé avec succès' };
   }
 } 

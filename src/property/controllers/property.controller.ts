@@ -12,7 +12,7 @@ import {
   UnauthorizedException,
 } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiResponse } from '@nestjs/swagger';
-import { PropertyService } from '../property.service';
+import { PropertyBaseService } from '../services/property-base.service';
 import { CreatePropertyDto } from '../dto/create-property.dto';
 import { JwtAuthGuard } from '../../auth/guards/jwt-auth.guard';
 import { RoleGuard } from '../../auth/guards/role.guard';
@@ -20,12 +20,14 @@ import { Roles } from '../../auth/decorators/roles.decorator';
 import { FilesInterceptor } from '@nestjs/platform-express';
 import { UPLOAD_CONFIG } from '../../config/upload.config';
 import { imageInterceptorOptions } from '../../interceptors/file.interceptor';
+import { PropertyOwnershipService } from '../services/property-ownership.service';
+import { PropertyTenantService } from '../services/property-tenant.service';
 
 @ApiTags('Propriétés')
 @Controller('properties')
 @UseGuards(JwtAuthGuard)
 export class PropertyController {
-  constructor(private readonly propertyService: PropertyService) {}
+  constructor(private readonly propertyBaseService: PropertyBaseService, private readonly propertyTenantService: PropertyTenantService) {}
 
   @Post()
   @ApiOperation({ summary: 'Créer une nouvelle propriété' })
@@ -44,7 +46,7 @@ export class PropertyController {
     if (files?.length > 0) {
       createPropertyDto.images = files.map(file => `/uploads/properties/images/${file.filename}`);
     }
-    return this.propertyService.create(createPropertyDto, req.user.id);
+    return this.propertyBaseService.create(createPropertyDto, req.user.id);
   }
 
   @Get('owner')
@@ -53,7 +55,7 @@ export class PropertyController {
   @Roles('OWNER')
   @UseGuards(RoleGuard)
   async findAll(@Request() req) {
-    return this.propertyService.findPropertiesByOwner(req.user.id);
+    return this.propertyBaseService.findPropertiesByOwner(req.user.id);
   }
 
   @Get(':id')
@@ -63,7 +65,7 @@ export class PropertyController {
   @Roles('OWNER')
   @UseGuards(RoleGuard)
   async findOne(@Param('id', ParseIntPipe) id: number, @Request() req) {
-    const property = await this.propertyService.findOne(id);
+    const property = await this.propertyBaseService.findOne(id);
     if (property.owner.id !== req.user.id) {
       throw new UnauthorizedException('Vous n\'êtes pas autorisé à accéder à cette propriété');
     }
@@ -79,7 +81,7 @@ export class PropertyController {
     @Param('id', ParseIntPipe) id: number,
     @Request() req
   ) {
-    const properties = await this.propertyService.findPropertiesByTenant(id);
+    const properties = await this.propertyTenantService.findPropertiesByTenant(id);
     return properties.filter(property => property.owner.id === req.user.id);
   }
 } 

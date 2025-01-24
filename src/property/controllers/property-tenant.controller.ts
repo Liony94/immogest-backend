@@ -9,24 +9,20 @@ import {
   UnauthorizedException,
 } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiResponse } from '@nestjs/swagger';
-import { PropertyService } from '../property.service';
+import { PropertyTenantService } from '../services/property-tenant.service';
 import { AddTenantsDto } from '../dto/add-tenants.dto';
 import { JwtAuthGuard } from '../../auth/guards/jwt-auth.guard';
 import { RoleGuard } from '../../auth/guards/role.guard';
 import { Roles } from '../../auth/decorators/roles.decorator';
+import { PropertyBaseService } from '../services/property-base.service';
+import { PropertyOwnershipService } from '../services/property-ownership.service';
 
 @ApiTags('Locataires des propriétés')
 @Controller('properties')
 @UseGuards(JwtAuthGuard)
 export class PropertyTenantController {
-  constructor(private readonly propertyService: PropertyService) {}
+  constructor(private readonly propertyTenantService: PropertyTenantService, private readonly propertyOwnershipService: PropertyOwnershipService) {}
 
-  private async checkPropertyOwnership(propertyId: number, userId: number): Promise<void> {
-    const property = await this.propertyService.findOne(propertyId);
-    if (property.owner.id !== userId) {
-      throw new UnauthorizedException('Vous n\'êtes pas autorisé à modifier cette propriété');
-    }
-  }
 
   @Post(':id/tenants')
   @ApiOperation({ summary: 'Ajouter des locataires à une propriété' })
@@ -39,7 +35,7 @@ export class PropertyTenantController {
     @Body() addTenantsDto: AddTenantsDto,
     @Request() req,
   ) {
-    await this.checkPropertyOwnership(id, req.user.id);
-    return this.propertyService.addTenants(id, addTenantsDto.tenantIds);
+    await this.propertyOwnershipService.checkPropertyOwnership(id, req.user.id);
+    return this.propertyTenantService.addTenants(id, addTenantsDto.tenantIds);
   }
 } 

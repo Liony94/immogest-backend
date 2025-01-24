@@ -14,7 +14,7 @@ import {
   UploadedFile,
 } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiResponse, ApiConsumes } from '@nestjs/swagger';
-import { PropertyService } from '../property.service';
+import { PropertyDocumentService } from '../services/property-document.service';
 import { CreatePropertyDocumentDto } from '../dto/create-property-document.dto';
 import { UpdatePropertyDocumentDto } from '../dto/update-property-document.dto';
 import { JwtAuthGuard } from '../../auth/guards/jwt-auth.guard';
@@ -22,19 +22,13 @@ import { RoleGuard } from '../../auth/guards/role.guard';
 import { Roles } from '../../auth/decorators/roles.decorator';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { documentInterceptorOptions } from '../../interceptors/file.interceptor';
+import { PropertyOwnershipService } from '../services/property-ownership.service';
 
 @ApiTags('Documents des propriétés')
 @Controller('properties')
 @UseGuards(JwtAuthGuard)
 export class PropertyDocumentController {
-  constructor(private readonly propertyService: PropertyService) {}
-
-  private async checkPropertyOwnership(propertyId: number, userId: number): Promise<void> {
-    const property = await this.propertyService.findOne(propertyId);
-    if (property.owner.id !== userId) {
-      throw new UnauthorizedException('Vous n\'êtes pas autorisé à modifier cette propriété');
-    }
-  }
+  constructor(private readonly propertyDocumentService: PropertyDocumentService, private readonly propertyOwnershipService: PropertyOwnershipService) {}
 
   @Post(':id/document')
   @ApiOperation({ summary: 'Ajouter un document à une propriété' })
@@ -50,7 +44,7 @@ export class PropertyDocumentController {
     @Body() createDocumentDto: CreatePropertyDocumentDto,
     @Request() req,
   ) {
-    await this.checkPropertyOwnership(id, req.user.id);
+    await this.propertyOwnershipService.checkPropertyOwnership(id, req.user.id);
 
     if (!file) {
       throw new BadRequestException('Le fichier est requis');
@@ -62,7 +56,7 @@ export class PropertyDocumentController {
       fileUrl: `/uploads/properties/documents/${file.filename}`,
     };
 
-    return this.propertyService.addDocument(id, documentData);
+    return this.propertyDocumentService.addDocument(id, documentData);
   }
 
   @Put('document/:id')
@@ -76,11 +70,11 @@ export class PropertyDocumentController {
     @Body() updateDocumentDto: UpdatePropertyDocumentDto,
     @Request() req,
   ) {
-    const document = await this.propertyService.findDocumentWithRelations(id);
+    const document = await this.propertyDocumentService.findDocumentWithRelations(id);
     if (document.property.owner.id !== req.user.id) {
       throw new UnauthorizedException('Vous n\'êtes pas autorisé à modifier ce document');
     }
-    return this.propertyService.updateDocument(id, updateDocumentDto);
+    return this.propertyDocumentService.updateDocument(id, updateDocumentDto);
   }
 
   @Put('document/:id/file')
@@ -96,14 +90,14 @@ export class PropertyDocumentController {
     @UploadedFile() file: Express.Multer.File,
     @Request() req,
   ) {
-    const document = await this.propertyService.findDocumentWithRelations(id);
+    const document = await this.propertyDocumentService.findDocumentWithRelations(id);
     if (document.property.owner.id !== req.user.id) {
       throw new UnauthorizedException('Vous n\'êtes pas autorisé à modifier ce document');
     }
     if (!file) {
       throw new BadRequestException('Le fichier est requis');
     }
-    return this.propertyService.updateDocumentFile(
+    return this.propertyDocumentService.updateDocumentFile(
       id,
       file.filename,
       `/uploads/properties/documents/${file.filename}`
@@ -120,11 +114,11 @@ export class PropertyDocumentController {
     @Param('id', ParseIntPipe) id: number,
     @Request() req,
   ) {
-    const document = await this.propertyService.findDocumentWithRelations(id);
+    const document = await this.propertyDocumentService.findDocumentWithRelations(id);
     if (document.property.owner.id !== req.user.id) {
       throw new UnauthorizedException('Vous n\'êtes pas autorisé à supprimer ce document');
     }
-    await this.propertyService.deleteDocument(id);
+    await this.propertyDocumentService.deleteDocument(id);
     return { message: 'Document supprimé avec succès' };
   }
 } 
