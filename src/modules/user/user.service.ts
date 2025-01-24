@@ -34,13 +34,11 @@ export class UserService {
   }
 
   async findByEmail(email: string) {
-    // Chercher d'abord dans les propriétaires
     const owner = await this.ownerRepository.findOne({ where: { email } });
     if (owner) {
       return { ...owner, role: UserRole.OWNER };
     }
 
-    // Si pas trouvé, chercher dans les locataires
     const tenant = await this.tenantRepository.findOne({ where: { email } });
     if (tenant) {
       return { ...tenant, role: UserRole.TENANT };
