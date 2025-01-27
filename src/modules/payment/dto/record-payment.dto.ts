@@ -1,20 +1,21 @@
-import { IsNotEmpty, IsNumber, IsString, Min, IsOptional } from 'class-validator';
+import { IsNotEmpty, IsNumber, IsString, IsOptional } from 'class-validator';
+import { Type } from 'class-transformer';
 
 export class RecordPaymentDto {
-  @IsNumber()
-  @Min(0)
   @IsNotEmpty()
+  @IsNumber()
+  @Type(() => Number)
   amount: number;
 
-  @IsString()
   @IsNotEmpty()
+  @IsString()
   paymentMethod: string;
 
-  @IsString()
   @IsOptional()
+  @IsString()
   transactionId?: string;
 
-  @IsString()
   @IsOptional()
+  @IsString()
   notes?: string;
 } 

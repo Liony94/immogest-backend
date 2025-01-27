@@ -3,6 +3,7 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { Payment } from 'src/entities/payment.entity';
 import { Receipt } from 'src/entities/receipt.entity';
+import { PaymentService } from './payment.service';
 import * as PDFDocument from 'pdfkit';
 
 @Injectable()
@@ -12,6 +13,7 @@ export class ReceiptService {
   constructor(
     @InjectRepository(Receipt)
     private receiptRepository: Repository<Receipt>,
+    private paymentService: PaymentService
   ) {}
 
   private async generatePDFBuffer(payment: Payment): Promise<{ buffer: Buffer; fileName: string }> {
@@ -53,10 +55,10 @@ export class ReceiptService {
            .moveDown(0.5);
         doc.fontSize(10)
            .text([
-             `${payment.paymentSchedule.property.owner.firstName} ${payment.paymentSchedule.property.owner.lastName}`,
-             payment.paymentSchedule.property.owner.address || '',
-             payment.paymentSchedule.property.owner.email,
-             payment.paymentSchedule.property.owner.phone || ''
+             `${payment.paymentSchedule.rental.property.owner.firstName} ${payment.paymentSchedule.rental.property.owner.lastName}`,
+             payment.paymentSchedule.rental.property.owner.address || '',
+             payment.paymentSchedule.rental.property.owner.email,
+             payment.paymentSchedule.rental.property.owner.phone || ''
            ].filter(Boolean).join('\n'))
            .moveDown(1.5);
 
@@ -66,10 +68,10 @@ export class ReceiptService {
            .moveDown(0.5);
         doc.fontSize(10)
            .text([
-             `${payment.paymentSchedule.tenant.firstName} ${payment.paymentSchedule.tenant.lastName}`,
-             payment.paymentSchedule.tenant.address || '',
-             payment.paymentSchedule.tenant.email,
-             payment.paymentSchedule.tenant.phone || ''
+             `${payment.paymentSchedule.rental.tenant.firstName} ${payment.paymentSchedule.rental.tenant.lastName}`,
+             payment.paymentSchedule.rental.tenant.address || '',
+             payment.paymentSchedule.rental.tenant.email,
+             payment.paymentSchedule.rental.tenant.phone || ''
            ].filter(Boolean).join('\n'))
            .moveDown(1.5);
 
@@ -79,8 +81,8 @@ export class ReceiptService {
            .moveDown(0.5);
         doc.fontSize(10)
            .text([
-             `${payment.paymentSchedule.property.identifier},`,
-             payment.paymentSchedule.property.address
+             `${payment.paymentSchedule.rental.property.identifier},`,
+             payment.paymentSchedule.rental.property.address
            ].join('\n'))
            .moveDown(1.5);
 
@@ -161,9 +163,9 @@ export class ReceiptService {
       month: dueDate.toLocaleString('fr-FR', { month: 'long' }),
       year: dueDate.getFullYear(),
       payment,
-      property: payment.paymentSchedule.property,
-      owner: payment.paymentSchedule.property.owner,
-      tenant: payment.paymentSchedule.tenant,
+      property: payment.paymentSchedule.rental.property,
+      owner: payment.paymentSchedule.rental.property.owner,
+      tenant: payment.paymentSchedule.rental.tenant,
       amount: payment.amount,
       paymentDate: payment.paidAt
     });

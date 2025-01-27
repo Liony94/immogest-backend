@@ -1,6 +1,7 @@
-import { ChildEntity, ManyToMany, Column } from 'typeorm';
+import { ChildEntity, ManyToMany, OneToMany, Column } from 'typeorm';
 import { User } from './user.entity';
 import { Property } from './property.entity';
+import { Rental } from './rental.entity';
 
 @ChildEntity()
 export class Tenant extends User {
@@ -12,4 +13,7 @@ export class Tenant extends User {
 
   @ManyToMany(() => Property, (property) => property.tenants)
   rentedProperties: Property[];
+
+  @OneToMany(() => Rental, rental => rental.tenant)
+  rentals: Rental[];
 } 

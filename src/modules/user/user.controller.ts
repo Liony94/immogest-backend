@@ -15,7 +15,7 @@ export class UserController {
     return this.userService.findOne(+id);
   }
 
-  @Get('/role/tenant')
+  @Get('/tenants')
   findUserByRoleTenant() {
     return this.userService.findUserByRoleTenant();
   }

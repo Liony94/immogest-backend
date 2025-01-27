@@ -1,90 +1,104 @@
 import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
-import { Payment } from 'src/entities/payment.entity';
-import { PaymentStatus } from 'src/entities/enums/payment-status.enum';
+import { Repository, Between } from 'typeorm';
+import { Payment } from '../../../entities/payment.entity';
+import { CreatePaymentDto } from '../dto/create-payment.dto';
+import { UpdatePaymentDto } from '../dto/update-payment.dto';
+import { PaymentStatus } from '../../../entities/enums/payment-status.enum';
 import { RecordPaymentDto } from '../dto/record-payment.dto';
 
 @Injectable()
 export class PaymentService {
   constructor(
     @InjectRepository(Payment)
-    private paymentRepository: Repository<Payment>,
+    private paymentRepository: Repository<Payment>
   ) {}
 
-  async recordPayment(paymentId: number, recordPaymentDto: RecordPaymentDto): Promise<Payment> {
-    const payment = await this.paymentRepository.findOne({
-      where: { id: paymentId },
-      relations: ['paymentSchedule']
+  async create(createPaymentDto: CreatePaymentDto) {
+    const payment = this.paymentRepository.create({
+      ...createPaymentDto,
+      paymentSchedule: { id: createPaymentDto.paymentScheduleId }
     });
+    return this.paymentRepository.save(payment);
+  }
 
+  async findOne(id: number) {
+    return this.paymentRepository.findOne({
+      where: { id },
+      relations: {
+        paymentSchedule: {
+          rental: {
+            property: {
+              owner: true
+            },
+            tenant: true
+          }
+        }
+      }
+    });
+  }
+
+  async update(id: number, updatePaymentDto: UpdatePaymentDto) {
+    const payment = await this.findOne(id);
     if (!payment) {
-      throw new NotFoundException(`Paiement #${paymentId} non trouvé`);
+      throw new NotFoundException(`Paiement #${id} non trouvé`);
     }
-
-    if (payment.status === PaymentStatus.PAID) {
-      throw new BadRequestException('Ce paiement a déjà été effectué');
-    }
-
-    const { amount, paymentMethod, transactionId, notes } = recordPaymentDto;
-
-    // Mise à jour du statut en fonction du montant payé
-    if (amount >= payment.amount) {
-      payment.status = PaymentStatus.PAID;
-      payment.paidAmount = payment.amount;
-    } else {
-      payment.status = PaymentStatus.PARTIALLY_PAID;
-      payment.paidAmount = amount;
-    }
-
-    payment.paidAt = new Date();
-    payment.paymentMethod = paymentMethod;
-    payment.transactionId = transactionId;
-    payment.notes = notes;
-
+    Object.assign(payment, updatePaymentDto);
     return this.paymentRepository.save(payment);
   }
 
-  async cancelPayment(paymentId: number): Promise<Payment> {
-    const payment = await this.findOne(paymentId);
-    
-    if (payment.status === PaymentStatus.PAID) {
-      throw new BadRequestException('Impossible d\'annuler un paiement déjà effectué');
+  async remove(id: number) {
+    const payment = await this.findOne(id);
+    if (!payment) {
+      throw new NotFoundException(`Paiement #${id} non trouvé`);
     }
-
-    payment.status = PaymentStatus.CANCELLED;
-    return this.paymentRepository.save(payment);
+    return this.paymentRepository.remove(payment);
   }
 
-  async findOne(id: number): Promise<Payment> {
-    const payment = await this.paymentRepository
-      .createQueryBuilder('payment')
-      .leftJoinAndSelect('payment.paymentSchedule', 'schedule')
-      .leftJoinAndSelect('schedule.tenant', 'tenant')
-      .leftJoinAndSelect('schedule.property', 'property')
-      .leftJoinAndSelect('property.owner', 'owner')
-      .where('payment.id = :id', { id })
-      .getOne();
+  async findAllLatePayments() {
+    const today = new Date();
+    return this.paymentRepository.find({
+      where: {
+        status: PaymentStatus.PENDING,
+        dueDate: Between(new Date('2000-01-01'), today)
+      },
+      relations: {
+        paymentSchedule: {
+          rental: {
+            property: {
+              owner: true
+            },
+            tenant: true
+          }
+        }
+      }
+    });
+  }
 
+  async recordPayment(id: number, recordPaymentDto: RecordPaymentDto) {
+    const payment = await this.findOne(id);
     if (!payment) {
       throw new NotFoundException(`Paiement #${id} non trouvé`);
     }
 
-    return payment;
+    payment.paidAmount = recordPaymentDto.amount;
+    payment.paidAt = new Date();
+    payment.paymentMethod = recordPaymentDto.paymentMethod;
+    payment.transactionId = recordPaymentDto.transactionId;
+    payment.status = PaymentStatus.PAID;
+    payment.notes = recordPaymentDto.notes;
+
+    return this.paymentRepository.save(payment);
   }
 
-  async updatePaymentStatus(): Promise<void> {
-    const today = new Date();
-    const pendingPayments = await this.paymentRepository.find({
-      where: { status: PaymentStatus.PENDING }
-    });
-
-    for (const payment of pendingPayments) {
-      if (payment.dueDate < today) {
-        payment.status = PaymentStatus.LATE;
-        await this.paymentRepository.save(payment);
-      }
+  async cancelPayment(id: number) {
+    const payment = await this.findOne(id);
+    if (!payment) {
+      throw new NotFoundException(`Paiement #${id} non trouvé`);
     }
+
+    payment.status = PaymentStatus.CANCELLED;
+    return this.paymentRepository.save(payment);
   }
 
   async getPaymentStatistics(scheduleId: number) {
@@ -92,96 +106,82 @@ export class PaymentService {
       where: { paymentSchedule: { id: scheduleId } }
     });
 
-    const totalDue = payments.reduce((sum, payment) => sum + payment.amount, 0);
-    const totalPaid = payments.reduce((sum, payment) => sum + (payment.paidAmount || 0), 0);
-    const totalLate = payments.filter(p => p.status === PaymentStatus.LATE).length;
-    const totalPending = payments.filter(p => p.status === PaymentStatus.PENDING).length;
+    const totalPayments = payments.length;
+    const paidPayments = payments.filter(p => p.status === PaymentStatus.PAID).length;
+    const latePayments = payments.filter(p => p.status === PaymentStatus.LATE).length;
+    const totalAmount = payments.reduce((sum, p) => sum + p.amount, 0);
+    const paidAmount = payments
+      .filter(p => p.status === PaymentStatus.PAID)
+      .reduce((sum, p) => sum + (p.paidAmount || 0), 0);
 
     return {
-      totalDue,
-      totalPaid,
-      totalLate,
-      totalPending,
-      balance: totalDue - totalPaid
+      totalPayments,
+      paidPayments,
+      latePayments,
+      totalAmount,
+      paidAmount,
+      remainingAmount: totalAmount - paidAmount
     };
   }
 
-  async updateLatePaymentsStatus(): Promise<{ updated: number }> {
+  async updateLatePaymentsStatus() {
     const today = new Date();
-    today.setHours(0, 0, 0, 0); // Début de la journée
+    const latePayments = await this.paymentRepository.find({
+      where: {
+        status: PaymentStatus.PENDING,
+        dueDate: Between(new Date('2000-01-01'), today)
+      }
+    });
 
-    const result = await this.paymentRepository
-      .createQueryBuilder()
-      .update(Payment)
-      .set({ status: PaymentStatus.LATE })
-      .where('status = :status', { status: PaymentStatus.PENDING })
-      .andWhere('dueDate < :today', { today })
-      .execute();
+    for (const payment of latePayments) {
+      payment.status = PaymentStatus.LATE;
+      await this.paymentRepository.save(payment);
+    }
 
-    return { updated: result.affected || 0 };
+    return { updated: latePayments.length };
   }
 
-  async archivePayment(paymentId: number): Promise<Payment> {
-    const payment = await this.findOne(paymentId);
+  async archivePayment(id: number) {
+    const payment = await this.findOne(id);
+    if (!payment) {
+      throw new NotFoundException(`Paiement #${id} non trouvé`);
+    }
+
     payment.isArchived = true;
     return this.paymentRepository.save(payment);
   }
 
-  async unarchivePayment(paymentId: number): Promise<Payment> {
-    const payment = await this.findOne(paymentId);
+  async unarchivePayment(id: number) {
+    const payment = await this.findOne(id);
+    if (!payment) {
+      throw new NotFoundException(`Paiement #${id} non trouvé`);
+    }
+
     payment.isArchived = false;
     return this.paymentRepository.save(payment);
   }
 
-  async archiveMultiplePayments(paymentIds: number[]): Promise<{ archived: number }> {
-    const result = await this.paymentRepository
-      .createQueryBuilder()
-      .update(Payment)
-      .set({ isArchived: true })
-      .where('id IN (:...ids)', { ids: paymentIds })
-      .execute();
-
-    return { archived: result.affected || 0 };
+  async archiveMultiplePayments(paymentIds: number[]) {
+    const payments = await this.paymentRepository.findByIds(paymentIds);
+    for (const payment of payments) {
+      payment.isArchived = true;
+      await this.paymentRepository.save(payment);
+    }
+    return { archived: payments.length };
   }
 
-  async getArchivedPayments(): Promise<Payment[]> {
+  async getArchivedPayments() {
     return this.paymentRepository.find({
       where: { isArchived: true },
-      relations: [
-        'paymentSchedule',
-        'paymentSchedule.tenant',
-        'paymentSchedule.property',
-        'paymentSchedule.property.owner'
-      ],
-      select: {
+      relations: {
         paymentSchedule: {
-          tenant: {
-            id: true,
-            firstName: true,
-            lastName: true,
-            email: true,
-            phone: true
-          },
-          property: {
-            id: true,
-            identifier: true,
-            address: true,
-            city: true,
-            zipCode: true,
-            type: true,
-            surface: true,
-            owner: {
-              id: true,
-              firstName: true,
-              lastName: true,
-              email: true,
-              phone: true
-            }
+          rental: {
+            property: {
+              owner: true
+            },
+            tenant: true
           }
         }
-      },
-      order: {
-        dueDate: 'DESC'
       }
     });
   }

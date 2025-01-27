@@ -14,6 +14,9 @@ import { Payment } from './entities/payment.entity';
 import { PaymentSchedule } from './entities/payment-schedule.entity';
 import { UserModule } from './modules/user/user.module';
 import { PaymentModule } from './modules/payment/payment.module';
+import { Rental } from './entities/rental.entity';
+import { RentalModule } from './modules/rental/rental.module';
+
 @Module({
   imports: [
     ConfigModule.forRoot({
@@ -24,7 +27,7 @@ import { PaymentModule } from './modules/payment/payment.module';
       inject: [ConfigService],
       useFactory: (configService: ConfigService) => ({
         ...configService.get('database'),
-        entities: [User, Property, Owner, Tenant, Payment, PaymentSchedule],
+        entities: [User, Property, Owner, Tenant, Payment, PaymentSchedule, Rental],
         synchronize: process.env.NODE_ENV !== 'production',
         dropSchema: false,
       }),
@@ -34,6 +37,7 @@ import { PaymentModule } from './modules/payment/payment.module';
     UserModule,
     PropertyModule,
     PaymentModule,
+    RentalModule,
   ],
   controllers: [AppController],
   providers: [AppService],

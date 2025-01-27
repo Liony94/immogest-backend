@@ -1,4 +1,4 @@
-import { Controller, Post, Body, Param, Get, Put, UseGuards, Res, BadRequestException, InternalServerErrorException, NotFoundException, Query, UnauthorizedException, Request } from '@nestjs/common';
+import { Controller, Post, Body, Param, Get, Put, UseGuards, Res, BadRequestException, InternalServerErrorException, NotFoundException, Query, UnauthorizedException, Request, Delete, ForbiddenException, Req } from '@nestjs/common';
 import { Response } from 'express';
 import { PaymentService } from '../services/payment.service';
 import { PaymentScheduleService } from '../services/payment-schedule.service';
@@ -9,6 +9,8 @@ import { Logger } from '@nestjs/common';
 import { JwtAuthGuard } from 'src/core/guards/jwt-auth.guard';
 import { RoleGuard } from 'src/core/guards/role.guard';
 import { Roles } from 'src/core/decorators/roles.decorator';
+import { CreatePaymentDto } from '../dto/create-payment.dto';
+import { UpdatePaymentDto } from '../dto/update-payment.dto';
 
 @Controller('payments')
 @UseGuards(JwtAuthGuard)
@@ -31,7 +33,7 @@ export class PaymentController {
         return [];
       }
       return schedules.filter(schedule => 
-        schedule.property?.owner?.id === req.user.id
+        schedule.rental?.property?.owner?.id === req.user.id
       );
     } catch (error) {
       this.logger.error(`Erreur lors de la récupération des échéanciers: ${error.message}`);
@@ -51,7 +53,7 @@ export class PaymentController {
   @UseGuards(RoleGuard)
   async getAllSchedules(@Request() req) {
     const schedules = await this.paymentScheduleService.findAll();
-    return schedules.filter(schedule => schedule.property.owner.id === req.user.id);
+    return schedules.filter(schedule => schedule.rental?.property.owner.id === req.user.id);
   }
 
   @Get('schedules/:id')
@@ -59,7 +61,7 @@ export class PaymentController {
   @UseGuards(RoleGuard)
   async getSchedule(@Param('id') id: number, @Request() req) {
     const schedule = await this.paymentScheduleService.findOne(id);
-    if (schedule.property.owner.id !== req.user.id) {
+    if (schedule.rental?.property.owner.id !== req.user.id) {
       throw new UnauthorizedException('Vous n\'êtes pas autorisé à accéder à cet échéancier');
     }
     return schedule;
@@ -69,13 +71,13 @@ export class PaymentController {
   @Roles('OWNER')
   @UseGuards(RoleGuard)
   async getSchedulesByProperty(@Param('propertyId') propertyId: number, @Request() req) {
-    const schedules = await this.paymentScheduleService.findByProperty(propertyId);
-    return schedules.filter(schedule => schedule.property.owner.id === req.user.id);
+    const schedules = await this.paymentScheduleService.findByPropertyId(propertyId);
+    return schedules.filter(schedule => schedule.rental?.property.owner.id === req.user.id);
   }
 
   @Get('schedules/tenant/:tenantId')
   async getSchedulesByTenant(@Param('tenantId') tenantId: number) {
-    return this.paymentScheduleService.findByTenant(tenantId);
+    return this.paymentScheduleService.findByTenantId(tenantId);
   }
 
   @Post(':id/record')
@@ -100,7 +102,7 @@ export class PaymentController {
   @UseGuards(RoleGuard)
   async getLatePayments(@Request() req) {
     const latePayments = await this.paymentScheduleService.getLatePayments();
-    return latePayments.filter(payment => payment.paymentSchedule.property.owner.id === req.user.id);
+    return latePayments.filter(payment => payment.paymentSchedule.rental?.property.owner.id === req.user.id);
   }
 
   @Get('statistics/:scheduleId')
@@ -222,7 +224,7 @@ export class PaymentController {
     try {
       const payment = await this.paymentService.findOne(id);
       
-      if (payment.paymentSchedule.property.owner.id !== req.user.id) {
+      if (payment.paymentSchedule.rental?.property.owner.id !== req.user.id) {
         throw new UnauthorizedException('Vous n\'êtes pas autorisé à accéder à cette quittance');
       }
 
@@ -303,7 +305,7 @@ export class PaymentController {
     try {
       const payment = await this.paymentService.findOne(id);
       
-      if (payment.paymentSchedule.property.owner.id !== req.user.id) {
+      if (payment.paymentSchedule.rental?.property.owner.id !== req.user.id) {
         throw new UnauthorizedException('Vous n\'êtes pas autorisé à accéder à cette quittance');
       }
 
@@ -329,5 +331,89 @@ export class PaymentController {
       }
       throw new InternalServerErrorException('Erreur lors de la prévisualisation de la quittance');
     }
+  }
+
+  @Post()
+  async create(@Body() createPaymentDto: CreatePaymentDto, @Req() req) {
+    const schedule = await this.paymentScheduleService.findOne(createPaymentDto.paymentScheduleId);
+    
+    if (!schedule) {
+      throw new ForbiddenException('Échéancier non trouvé');
+    }
+
+    // Vérifier que l'utilisateur est le propriétaire
+    if (schedule.rental?.property.owner.id !== req.user.id) {
+      throw new ForbiddenException('Vous n\'êtes pas autorisé à créer des paiements pour cet échéancier');
+    }
+
+    return this.paymentService.create(createPaymentDto);
+  }
+
+  @Get()
+  async findAll(@Req() req) {
+    const schedules = await this.paymentScheduleService.findAll();
+    return schedules.filter(schedule => schedule.rental?.property.owner.id === req.user.id);
+  }
+
+  @Get(':id')
+  async findOne(@Param('id') id: string, @Req() req) {
+    const schedule = await this.paymentScheduleService.findOne(+id);
+    
+    if (!schedule) {
+      throw new ForbiddenException('Échéancier non trouvé');
+    }
+
+    if (schedule.rental?.property.owner.id !== req.user.id) {
+      throw new ForbiddenException('Vous n\'êtes pas autorisé à voir cet échéancier');
+    }
+
+    return schedule;
+  }
+
+  @Get('tenant/:tenantId')
+  async findByTenant(@Param('tenantId') tenantId: string, @Req() req) {
+    const schedules = await this.paymentScheduleService.findByTenantId(+tenantId);
+    return schedules.filter(schedule => schedule.rental?.property.owner.id === req.user.id);
+  }
+
+  @Get('property/:propertyId')
+  async findByProperty(@Param('propertyId') propertyId: string, @Req() req) {
+    return this.paymentScheduleService.findByPropertyId(+propertyId);
+  }
+
+  @Get('late/all')
+  async findAllLatePayments(@Req() req) {
+    const latePayments = await this.paymentService.findAllLatePayments();
+    return latePayments.filter(payment => payment.paymentSchedule.rental?.property.owner.id === req.user.id);
+  }
+
+  @Put(':id')
+  async update(@Param('id') id: string, @Body() updatePaymentDto: UpdatePaymentDto, @Req() req) {
+    const payment = await this.paymentService.findOne(+id);
+    
+    if (!payment) {
+      throw new ForbiddenException('Paiement non trouvé');
+    }
+
+    if (payment.paymentSchedule.rental?.property.owner.id !== req.user.id) {
+      throw new ForbiddenException('Vous n\'êtes pas autorisé à modifier ce paiement');
+    }
+
+    return this.paymentService.update(+id, updatePaymentDto);
+  }
+
+  @Delete(':id')
+  async remove(@Param('id') id: string, @Req() req) {
+    const payment = await this.paymentService.findOne(+id);
+    
+    if (!payment) {
+      throw new ForbiddenException('Paiement non trouvé');
+    }
+
+    if (payment.paymentSchedule.rental?.property.owner.id !== req.user.id) {
+      throw new ForbiddenException('Vous n\'êtes pas autorisé à supprimer ce paiement');
+    }
+
+    return this.paymentService.remove(+id);
   }
 } 

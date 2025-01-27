@@ -1,33 +1,29 @@
-import { IsNotEmpty, IsNumber, IsDate, Min, IsInt, Max } from 'class-validator';
+import { IsNotEmpty, IsNumber, IsDate, IsInt, Min, Max } from 'class-validator';
 import { Type } from 'class-transformer';
 
 export class CreatePaymentScheduleDto {
+  @IsNotEmpty()
   @Type(() => Date)
   @IsDate()
-  @IsNotEmpty()
   startDate: Date;
 
+  @IsNotEmpty()
   @Type(() => Date)
   @IsDate()
-  @IsNotEmpty()
   endDate: Date;
 
-  @IsNumber()
-  @Min(0)
   @IsNotEmpty()
+  @IsNumber()
+  @Type(() => Number)
   monthlyAmount: number;
 
+  @IsNotEmpty()
   @IsInt()
   @Min(1)
   @Max(31)
-  @IsNotEmpty()
   dayOfMonth: number;
 
-  @IsNumber()
   @IsNotEmpty()
-  propertyId: number;
-
   @IsNumber()
-  @IsNotEmpty()
-  tenantId: number;
+  rentalId: number;
 } 

@@ -8,6 +8,7 @@ import { BuildingType, BuildingLegalStatus } from './enums/building-type.enum';
 import { PropertyAccess } from './property-access.entity';
 import { PropertyDocument } from './property-document.entity';
 import { VisibilityStatus } from './enums/visibility-status.enum';
+import { Rental } from './rental.entity';
 
 @Entity()
 export class Property {
@@ -251,4 +252,9 @@ export class Property {
     cascade: true
   })
   documents: PropertyDocument[];
+
+  @OneToMany(() => Rental, rental => rental.property, {
+    cascade: true
+  })
+  rentals: Rental[];
 }

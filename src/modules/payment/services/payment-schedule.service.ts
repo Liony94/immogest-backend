@@ -1,43 +1,44 @@
 import { Injectable, NotFoundException, BadRequestException, InternalServerErrorException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, Between } from 'typeorm';
-import { PaymentSchedule } from 'src/entities/payment-schedule.entity';
-import { Payment } from 'src/entities/payment.entity';
-import { PaymentStatus } from 'src/entities/enums/payment-status.enum';
+import { PaymentSchedule } from '../../../entities/payment-schedule.entity';
+import { Payment } from '../../../entities/payment.entity';
+import { PaymentStatus } from '../../../entities/enums/payment-status.enum';
 import { CreatePaymentScheduleDto } from '../dto/create-payment-schedule.dto';
+import { UpdatePaymentScheduleDto } from '../dto/update-payment-schedule.dto';
+
 @Injectable()
 export class PaymentScheduleService {
   constructor(
     @InjectRepository(PaymentSchedule)
     private paymentScheduleRepository: Repository<PaymentSchedule>,
     @InjectRepository(Payment)
-    private paymentRepository: Repository<Payment>,
+    private paymentRepository: Repository<Payment>
   ) {}
 
-  async create(createPaymentScheduleDto: CreatePaymentScheduleDto): Promise<PaymentSchedule> {
+  async create(createPaymentScheduleDto: CreatePaymentScheduleDto) {
     const schedule = this.paymentScheduleRepository.create({
       startDate: createPaymentScheduleDto.startDate,
       endDate: createPaymentScheduleDto.endDate,
       monthlyAmount: createPaymentScheduleDto.monthlyAmount,
       dayOfMonth: createPaymentScheduleDto.dayOfMonth,
-      property: { id: createPaymentScheduleDto.propertyId },
-      tenant: { id: createPaymentScheduleDto.tenantId }
+      rental: { id: createPaymentScheduleDto.rentalId }
     });
-    
+
     await this.paymentScheduleRepository.save(schedule);
-    
-    // Générer les paiements mensuels pour toute la période
+
+    // Générer les paiements mensuels
     await this.generateMonthlyPayments(schedule);
-    
+
     return schedule;
   }
 
-  private async generateMonthlyPayments(schedule: PaymentSchedule): Promise<void> {
+  private async generateMonthlyPayments(schedule: PaymentSchedule) {
     const startDate = new Date(schedule.startDate);
     const endDate = new Date(schedule.endDate);
     const currentDate = new Date(startDate);
     const today = new Date();
-    today.setHours(0, 0, 0, 0); // Début de la journée
+    today.setHours(0, 0, 0, 0);
 
     while (currentDate <= endDate) {
       const dueDate = new Date(currentDate.setDate(schedule.dayOfMonth));
@@ -51,154 +52,96 @@ export class PaymentScheduleService {
 
       await this.paymentRepository.save(payment);
       
-      // Passer au mois suivant
       currentDate.setMonth(currentDate.getMonth() + 1);
     }
   }
 
-  async findAll(): Promise<PaymentSchedule[]> {
-    try {
-      return this.paymentScheduleRepository.find({
-        relations: {
+  async findAll() {
+    return this.paymentScheduleRepository.find({
+      relations: {
+        rental: {
           property: {
             owner: true
           },
-          tenant: true,
-          payments: true
+          tenant: true
         },
-        select: {
-          tenant: {
-            id: true,
-            firstName: true,
-            lastName: true,
-            email: true,
-            phone: true,
-            address: true,
-            guarantorName: true,
-            guarantorPhone: true
-          },
-          property: {
-            id: true,
-            identifier: true,
-            address: true,
-            city: true,
-            zipCode: true,
-            type: true,
-            surface: true,
-            owner: {
-              id: true,
-              firstName: true,
-              lastName: true,
-              email: true,
-              phone: true
-            }
-          }
-        }
-      });
-    } catch (error) {
-      throw new InternalServerErrorException(
-        `Erreur lors de la récupération des échéanciers: ${error.message}`
-      );
-    }
+        payments: true
+      }
+    });
   }
 
-  async findOne(id: number): Promise<PaymentSchedule> {
+  async findOne(id: number) {
+    return this.paymentScheduleRepository.findOne({
+      where: { id },
+      relations: {
+        rental: {
+          property: {
+            owner: true
+          },
+          tenant: true
+        },
+        payments: true
+      }
+    });
+  }
+
+  async findByTenantId(tenantId: number) {
+    return this.paymentScheduleRepository.find({
+      where: { rental: { tenant: { id: tenantId } } },
+      relations: {
+        rental: {
+          property: {
+            owner: true
+          },
+          tenant: true
+        },
+        payments: true
+      }
+    });
+  }
+
+  async findByPropertyId(propertyId: number) {
+    return this.paymentScheduleRepository.find({
+      where: { rental: { property: { id: propertyId } } },
+      relations: {
+        rental: {
+          property: {
+            owner: true
+          },
+          tenant: true
+        },
+        payments: true
+      }
+    });
+  }
+
+  async update(id: number, updatePaymentScheduleDto: UpdatePaymentScheduleDto) {
     const schedule = await this.paymentScheduleRepository.findOne({
       where: { id },
-      relations: [
-        'property',
-        'tenant',
-        'payments',
-        'tenant.rentedProperties',
-        'property.owner'
-      ],
-      select: {
-        tenant: {
-          id: true,
-          firstName: true,
-          lastName: true,
-          email: true,
-          phone: true,
-          address: true,
-          guarantorName: true,
-          guarantorPhone: true
-        },
-        property: {
-          id: true,
-          identifier: true,
-          address: true,
-          city: true,
-          zipCode: true,
-          type: true,
-          surface: true,
-          owner: {
-            id: true,
-            firstName: true,
-            lastName: true,
-            email: true,
-            phone: true
-          }
+      relations: {
+        rental: {
+          property: {
+            owner: true
+          },
+          tenant: true
         }
       }
     });
 
     if (!schedule) {
-      throw new NotFoundException(`Échéancier #${id} non trouvé`);
+      return null;
     }
 
-    return schedule;
+    Object.assign(schedule, updatePaymentScheduleDto);
+    return this.paymentScheduleRepository.save(schedule);
   }
 
-  async findByTenant(tenantId: number): Promise<PaymentSchedule[]> {
-    return this.paymentScheduleRepository.find({
-      where: { tenant: { id: tenantId } },
-      relations: [
-        'property',
-        'payments',
-        'property.owner'
-      ],
-      select: {
-        property: {
-          id: true,
-          identifier: true,
-          address: true,
-          city: true,
-          zipCode: true,
-          type: true,
-          surface: true,
-          owner: {
-            id: true,
-            firstName: true,
-            lastName: true,
-            email: true,
-            phone: true
-          }
-        }
-      }
-    });
-  }
-
-  async findByProperty(propertyId: number): Promise<PaymentSchedule[]> {
-    return this.paymentScheduleRepository.find({
-      where: { property: { id: propertyId } },
-      relations: [
-        'tenant',
-        'payments',
-        'tenant.rentedProperties'
-      ],
-      select: {
-        tenant: {
-          id: true,
-          firstName: true,
-          lastName: true,
-          email: true,
-          phone: true,
-          address: true,
-          guarantorName: true,
-          guarantorPhone: true
-        }
-      }
-    });
+  async remove(id: number) {
+    const schedule = await this.findOne(id);
+    if (!schedule) {
+      return null;
+    }
+    return this.paymentScheduleRepository.remove(schedule);
   }
 
   async getLatePayments(): Promise<Payment[]> {
@@ -208,36 +151,13 @@ export class PaymentScheduleService {
         status: PaymentStatus.PENDING,
         dueDate: Between(new Date('2000-01-01'), today)
       },
-      relations: [
-        'paymentSchedule',
-        'paymentSchedule.tenant',
-        'paymentSchedule.property',
-        'paymentSchedule.property.owner'
-      ],
-      select: {
+      relations: {
         paymentSchedule: {
-          tenant: {
-            id: true,
-            firstName: true,
-            lastName: true,
-            email: true,
-            phone: true
-          },
-          property: {
-            id: true,
-            identifier: true,
-            address: true,
-            city: true,
-            zipCode: true,
-            type: true,
-            surface: true,
-            owner: {
-              id: true,
-              firstName: true,
-              lastName: true,
-              email: true,
-              phone: true
-            }
+          rental: {
+            property: {
+              owner: true
+            },
+            tenant: true
           }
         }
       }
@@ -246,6 +166,9 @@ export class PaymentScheduleService {
 
   async deactivate(id: number): Promise<void> {
     const schedule = await this.findOne(id);
+    if (!schedule) {
+      throw new NotFoundException(`Échéancier #${id} non trouvé`);
+    }
     schedule.isActive = false;
     await this.paymentScheduleRepository.save(schedule);
   }
@@ -256,6 +179,10 @@ export class PaymentScheduleService {
     }
 
     const schedule = await this.findOne(id);
+    if (!schedule) {
+      throw new NotFoundException(`Échéancier #${id} non trouvé`);
+    }
+
     schedule.monthlyAmount = newAmount;
 
     // Mettre à jour les paiements futurs non payés

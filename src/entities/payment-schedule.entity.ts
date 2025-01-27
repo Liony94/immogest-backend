@@ -2,6 +2,8 @@ import { Entity, PrimaryGeneratedColumn, Column, ManyToOne, OneToMany, CreateDat
 import { Property } from './property.entity';
 import { Tenant } from './tenant.entity';
 import { Payment } from './payment.entity';
+import { Rental } from './rental.entity';
+
 @Entity()
 export class PaymentSchedule {
   @PrimaryGeneratedColumn()
@@ -20,13 +22,10 @@ export class PaymentSchedule {
   isActive: boolean;
 
   @Column({ type: 'int' })
-  dayOfMonth: number; // Jour du mois où le paiement est dû
+  dayOfMonth: number;
 
-  @ManyToOne(() => Property, { nullable: false })
-  property: Property;
-
-  @ManyToOne(() => Tenant, { nullable: false })
-  tenant: Tenant;
+  @ManyToOne(() => Rental, rental => rental.paymentSchedules, { nullable: false })
+  rental: Rental;
 
   @OneToMany(() => Payment, payment => payment.paymentSchedule)
   payments: Payment[];
