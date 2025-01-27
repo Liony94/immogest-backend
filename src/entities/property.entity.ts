@@ -2,12 +2,12 @@ import { Entity, PrimaryGeneratedColumn, Column, ManyToOne, OneToMany, ManyToMan
 import { Owner } from './owner.entity';
 import { User } from './user.entity';
 import { Tenant } from './tenant.entity';
-import { PropertyType } from './enums/property-type.enum';
-import { PropertyTaxRegime } from './enums/property-tax-regime.enum';
-import { BuildingType, BuildingLegalStatus } from './enums/building-type.enum';
+import { PropertyType } from './enums/properties/property-type.enum';
+import { PropertyTaxRegime } from './enums/properties/property-tax-regime.enum';
+import { BuildingType, BuildingLegalStatus } from './enums/properties/building-type.enum';
 import { PropertyAccess } from './property-access.entity';
 import { PropertyDocument } from './property-document.entity';
-import { VisibilityStatus } from './enums/visibility-status.enum';
+import { VisibilityStatus } from './enums/properties/visibility-status.enum';
 import { Rental } from './rental.entity';
 
 @Entity()

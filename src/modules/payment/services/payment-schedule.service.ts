@@ -3,7 +3,7 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, Between } from 'typeorm';
 import { PaymentSchedule } from '../../../entities/payment-schedule.entity';
 import { Payment } from '../../../entities/payment.entity';
-import { PaymentStatus } from '../../../entities/enums/payment-status.enum';
+import { PaymentStatus } from '../../../entities/enums/properties/payment-status.enum';
 import { CreatePaymentScheduleDto } from '../dto/create-payment-schedule.dto';
 import { UpdatePaymentScheduleDto } from '../dto/update-payment-schedule.dto';
 

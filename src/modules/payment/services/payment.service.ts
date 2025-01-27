@@ -4,7 +4,7 @@ import { Repository, Between } from 'typeorm';
 import { Payment } from '../../../entities/payment.entity';
 import { CreatePaymentDto } from '../dto/create-payment.dto';
 import { UpdatePaymentDto } from '../dto/update-payment.dto';
-import { PaymentStatus } from '../../../entities/enums/payment-status.enum';
+import { PaymentStatus } from '../../../entities/enums/properties/payment-status.enum';
 import { RecordPaymentDto } from '../dto/record-payment.dto';
 
 @Injectable()

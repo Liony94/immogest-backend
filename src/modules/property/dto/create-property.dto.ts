@@ -1,9 +1,9 @@
 import { IsString, IsNumber, IsOptional, IsArray, IsEnum, IsBoolean, IsDate } from 'class-validator';
 import { Type, Transform } from 'class-transformer';
-import { PropertyType } from '../../../entities/enums/property-type.enum';
-import { BuildingType, BuildingLegalStatus } from '../../../entities/enums/building-type.enum';
-import { PropertyTaxRegime } from '../../../entities/enums/property-tax-regime.enum';
-import { VisibilityStatus } from '../../../entities/enums/visibility-status.enum';
+import { PropertyType } from '../../../entities/enums/properties/property-type.enum';
+import { BuildingType, BuildingLegalStatus } from '../../../entities/enums/properties/building-type.enum';
+import { PropertyTaxRegime } from '../../../entities/enums/properties/property-tax-regime.enum';
+import { VisibilityStatus } from '../../../entities/enums/properties/visibility-status.enum';
 
 // Fonction utilitaire pour convertir les chaînes en nombres décimaux
 const toDecimal = (value: any): number => {

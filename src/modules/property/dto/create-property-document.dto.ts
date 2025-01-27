@@ -1,6 +1,6 @@
 import { IsString, IsOptional, IsEnum, IsDate, IsBoolean } from 'class-validator';
 import { Type } from 'class-transformer';
-import { DocumentType } from '../../../entities/enums/document-type.enum';
+import { DocumentType } from '../../../entities/enums/properties/document-type.enum';
 
 export class CreatePropertyDocumentDto {
   @IsEnum(DocumentType)

@@ -1,6 +1,6 @@
 import { Entity, PrimaryGeneratedColumn, Column, ManyToOne } from 'typeorm';
 import { Property } from './property.entity';
-import { DocumentType } from './enums/document-type.enum';
+import { DocumentType } from './enums/properties/document-type.enum';
 
 @Entity()
 export class PropertyDocument {

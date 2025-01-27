@@ -1,5 +1,5 @@
 import { IsString, IsOptional, IsEnum, IsNumber } from 'class-validator';
-import { AccessType } from '../../../entities/enums/access-type.enum';
+import { AccessType } from '../../../entities/enums/properties/access-type.enum';
 
 export class UpdatePropertyAccessDto {
   @IsOptional()

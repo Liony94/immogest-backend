@@ -1,4 +1,4 @@
-import { Controller, Get, Post, Body, Param, Delete, Put, UseGuards, Req, ForbiddenException } from '@nestjs/common';
+import { Controller, Get, Post, Body, Param, Delete, Put, UseGuards, Req } from '@nestjs/common';
 import { RentalService } from '../services/rental.service';
 import { CreateRentalDto } from '../dto/create-rental.dto';
 import { UpdateRentalDto } from '../dto/update-rental.dto';
@@ -132,36 +132,6 @@ export class RentalController {
     return this.rentalService.deactivate(+id);
   }
 
-  @Post(':id/furniture')
-  @Roles('OWNER')
-  @UseGuards(RoleGuard)
-  async addFurniture(
-    @Param('id') id: string,
-    @Body() body: { furniture: string[] },
-    @CheckOwnership({
-      serviceClass: PropertyOwnershipService,
-      verifyMethod: 'verifyPropertyOwner',
-      errorMessage: 'Vous n\'êtes pas autorisé à modifier les meubles de cette location'
-    }) isOwner: boolean
-  ) {
-    return this.rentalService.addFurniture(+id, body.furniture);
-  }
-
-  @Delete(':id/furniture')
-  @Roles('OWNER')
-  @UseGuards(RoleGuard)
-  async removeFurniture(
-    @Param('id') id: string,
-    @Body() body: { furniture: string[] },
-    @CheckOwnership({
-      serviceClass: PropertyOwnershipService,
-      verifyMethod: 'verifyPropertyOwner',
-      errorMessage: 'Vous n\'êtes pas autorisé à modifier les meubles de cette location'
-    }) isOwner: boolean
-  ) {
-    return this.rentalService.removeFurniture(+id, body.furniture);
-  }
-
   @Post(':id/check-in')
   @Roles('OWNER')
   @UseGuards(RoleGuard)
@@ -190,5 +160,132 @@ export class RentalController {
     }) isOwner: boolean
   ) {
     return this.rentalService.updateCheckOut(+id, body.notes);
+  }
+
+  @Put(':id/rent-revision')
+  @Roles('OWNER')
+  @UseGuards(RoleGuard)
+  async updateRentRevision(
+    @Param('id') id: string,
+    @Body() body: { enabled: boolean; index: string; period: number },
+    @CheckOwnership({
+      serviceClass: PropertyOwnershipService,
+      verifyMethod: 'verifyPropertyOwner',
+      errorMessage: 'Vous n\'êtes pas autorisé à modifier la révision du loyer'
+    }) isOwner: boolean
+  ) {
+    return this.rentalService.updateRentRevision(+id, body.enabled, body.index, body.period);
+  }
+
+  @Put(':id/rent-control')
+  @Roles('OWNER')
+  @UseGuards(RoleGuard)
+  async updateRentControl(
+    @Param('id') id: string,
+    @Body() body: {
+      enabled: boolean;
+      referenceRent: number;
+      maxRent: number;
+      supplement: number;
+      justification: string;
+    },
+    @CheckOwnership({
+      serviceClass: PropertyOwnershipService,
+      verifyMethod: 'verifyPropertyOwner',
+      errorMessage: 'Vous n\'êtes pas autorisé à modifier l\'encadrement des loyers'
+    }) isOwner: boolean
+  ) {
+    return this.rentalService.updateRentControl(
+      +id,
+      body.enabled,
+      body.referenceRent,
+      body.maxRent,
+      body.supplement,
+      body.justification
+    );
+  }
+
+  @Put(':id/notifications')
+  @Roles('OWNER')
+  @UseGuards(RoleGuard)
+  async updateNotifications(
+    @Param('id') id: string,
+    @Body() body: {
+      notifyOwner: boolean;
+      notifyTenant: boolean;
+      notifyContractEnd: boolean;
+    },
+    @CheckOwnership({
+      serviceClass: PropertyOwnershipService,
+      verifyMethod: 'verifyPropertyOwner',
+      errorMessage: 'Vous n\'êtes pas autorisé à modifier les notifications'
+    }) isOwner: boolean
+  ) {
+    return this.rentalService.updateNotifications(
+      +id,
+      body.notifyOwner,
+      body.notifyTenant,
+      body.notifyContractEnd
+    );
+  }
+
+  @Put(':id/works')
+  @Roles('OWNER')
+  @UseGuards(RoleGuard)
+  async updateWorks(
+    @Param('id') id: string,
+    @Body() body: {
+      ownerWorkAmount: number;
+      ownerWorkDescription: string;
+      tenantWorkAmount: number;
+      tenantWorkDescription: string;
+    },
+    @CheckOwnership({
+      serviceClass: PropertyOwnershipService,
+      verifyMethod: 'verifyPropertyOwner',
+      errorMessage: 'Vous n\'êtes pas autorisé à modifier les travaux'
+    }) isOwner: boolean
+  ) {
+    return this.rentalService.updateWorks(
+      +id,
+      body.ownerWorkAmount,
+      body.ownerWorkDescription,
+      body.tenantWorkAmount,
+      body.tenantWorkDescription
+    );
+  }
+
+  @Put(':id/billing')
+  @Roles('OWNER')
+  @UseGuards(RoleGuard)
+  async updateBilling(
+    @Param('id') id: string,
+    @Body() body: {
+      billingDay: number;
+      separateBillingAddress: boolean;
+      billingAddress: string;
+      documentTitle: string;
+      automaticNumbering: boolean;
+      includeNoticeSecondPage: boolean;
+      receiptText: string;
+      noticeText: string;
+    },
+    @CheckOwnership({
+      serviceClass: PropertyOwnershipService,
+      verifyMethod: 'verifyPropertyOwner',
+      errorMessage: 'Vous n\'êtes pas autorisé à modifier la facturation'
+    }) isOwner: boolean
+  ) {
+    return this.rentalService.updateBilling(
+      +id,
+      body.billingDay,
+      body.separateBillingAddress,
+      body.billingAddress,
+      body.documentTitle,
+      body.automaticNumbering,
+      body.includeNoticeSecondPage,
+      body.receiptText,
+      body.noticeText
+    );
   }
 } 

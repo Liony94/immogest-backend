@@ -5,6 +5,10 @@ import { Rental } from '../../../entities/rental.entity';
 import { CreateRentalDto } from '../dto/create-rental.dto';
 import { UpdateRentalDto } from '../dto/update-rental.dto';
 import { IRentalService } from '../interfaces/rental.interface';
+import { RentalType } from '../../../entities/enums/rentals/rental-type.enum';
+import { PaymentFrequency } from '../../../entities/enums/rentals/payment-frequency.enum';
+import { PaymentType } from '../../../entities/enums/rentals/payment-type.enum';
+import { ChargeType } from '../../../entities/enums/rentals/charge-type.enum';
 
 @Injectable()
 export class RentalService implements IRentalService {
@@ -37,6 +41,7 @@ export class RentalService implements IRentalService {
       property: { id: createRentalDto.propertyId },
       tenant: { id: createRentalDto.tenantId }
     });
+
     return this.rentalRepository.save(rental);
   }
 
@@ -122,18 +127,6 @@ export class RentalService implements IRentalService {
     return this.rentalRepository.save(rental);
   }
 
-  async addFurniture(id: number, furniture: string[]): Promise<Rental> {
-    const rental = await this.findOne(id);
-    rental.furniture = [...new Set([...rental.furniture, ...furniture])];
-    return this.rentalRepository.save(rental);
-  }
-
-  async removeFurniture(id: number, furniture: string[]): Promise<Rental> {
-    const rental = await this.findOne(id);
-    rental.furniture = rental.furniture.filter(item => !furniture.includes(item));
-    return this.rentalRepository.save(rental);
-  }
-
   async updateCheckIn(id: number, notes: string): Promise<Rental> {
     const rental = await this.findOne(id);
     rental.checkInNotes = notes;
@@ -145,6 +138,87 @@ export class RentalService implements IRentalService {
     const rental = await this.findOne(id);
     rental.checkOutNotes = notes;
     rental.checkOutDate = new Date();
+    return this.rentalRepository.save(rental);
+  }
+
+  // Nouvelles méthodes pour la gestion des révisions de loyer
+  async updateRentRevision(id: number, enabled: boolean, index: string, period: number): Promise<Rental> {
+    const rental = await this.findOne(id);
+    rental.rentRevisionEnabled = enabled;
+    rental.rentRevisionIndex = index;
+    rental.rentRevisionPeriod = period;
+    return this.rentalRepository.save(rental);
+  }
+
+  // Méthode pour la gestion de l'encadrement des loyers
+  async updateRentControl(
+    id: number, 
+    enabled: boolean, 
+    referenceRent: number, 
+    maxRent: number, 
+    supplement: number, 
+    justification: string
+  ): Promise<Rental> {
+    const rental = await this.findOne(id);
+    rental.rentControlEnabled = enabled;
+    rental.referenceRent = referenceRent;
+    rental.maxRent = maxRent;
+    rental.rentSupplement = supplement;
+    rental.rentSupplementJustification = justification;
+    return this.rentalRepository.save(rental);
+  }
+
+  // Méthode pour la gestion des notifications
+  async updateNotifications(
+    id: number,
+    notifyOwner: boolean,
+    notifyTenant: boolean,
+    notifyContractEnd: boolean
+  ): Promise<Rental> {
+    const rental = await this.findOne(id);
+    rental.notifyOwner = notifyOwner;
+    rental.notifyTenant = notifyTenant;
+    rental.notifyContractEnd = notifyContractEnd;
+    return this.rentalRepository.save(rental);
+  }
+
+  // Méthode pour la gestion des travaux
+  async updateWorks(
+    id: number,
+    ownerWorkAmount: number,
+    ownerWorkDescription: string,
+    tenantWorkAmount: number,
+    tenantWorkDescription: string
+  ): Promise<Rental> {
+    const rental = await this.findOne(id);
+    rental.ownerWorkAmount = ownerWorkAmount;
+    rental.ownerWorkDescription = ownerWorkDescription;
+    rental.tenantWorkAmount = tenantWorkAmount;
+    rental.tenantWorkDescription = tenantWorkDescription;
+    return this.rentalRepository.save(rental);
+  }
+
+  // Méthode pour la gestion de la facturation
+  async updateBilling(
+    id: number,
+    billingDay: number,
+    separateBillingAddress: boolean,
+    billingAddress: string,
+    documentTitle: string,
+    automaticNumbering: boolean,
+    includeNoticeSecondPage: boolean,
+    receiptText: string,
+    noticeText: string
+  ): Promise<Rental> {
+    const rental = await this.findOne(id);
+    rental.billingDay = billingDay;
+    rental.separateBillingAddress = separateBillingAddress;
+    rental.billingAddress = billingAddress;
+    rental.documentTitle = documentTitle;
+    rental.automaticNumbering = automaticNumbering;
+    rental.includeNoticeSecondPage = includeNoticeSecondPage;
+    rental.receiptText = receiptText;
+    rental.noticeText = noticeText;
     return this.rentalRepository.save(rental);
   }
 } 

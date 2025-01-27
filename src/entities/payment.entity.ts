@@ -1,6 +1,6 @@
 import { Entity, PrimaryGeneratedColumn, Column, ManyToOne, CreateDateColumn, UpdateDateColumn } from 'typeorm';
 import { PaymentSchedule } from './payment-schedule.entity';
-import { PaymentStatus } from './enums/payment-status.enum';
+import { PaymentStatus } from './enums/properties/payment-status.enum';
 
 @Entity()
 export class Payment {

@@ -1,6 +1,6 @@
 import { Entity, PrimaryGeneratedColumn, Column, ManyToOne } from 'typeorm';
 import { Property } from './property.entity';
-import { AccessType } from './enums/access-type.enum';
+import { AccessType } from './enums/properties/access-type.enum';
 
 @Entity()
 export class PropertyAccess {
