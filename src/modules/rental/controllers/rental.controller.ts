@@ -6,6 +6,7 @@ import { JwtAuthGuard } from '../../../core/guards/jwt-auth.guard';
 import { RoleGuard } from '../../../core/guards/role.guard';
 import { Roles } from '../../../core/decorators/roles.decorator';
 import { CheckOwnership } from '../../../core/decorators/check-ownership.decorator';
+import { PropertyOwnershipService } from '../services/property-ownership.service';
 
 @Controller('rentals')
 @UseGuards(JwtAuthGuard)
@@ -18,7 +19,7 @@ export class RentalController {
   async create(
     @Body() createRentalDto: CreateRentalDto,
     @CheckOwnership({
-      serviceClass: RentalService,
+      serviceClass: PropertyOwnershipService,
       verifyMethod: 'verifyPropertyOwner',
       idField: 'propertyId',
       fromBody: true,
@@ -32,8 +33,7 @@ export class RentalController {
   @Roles('OWNER')
   @UseGuards(RoleGuard)
   async findAll(@Req() req) {
-    const rentals = await this.rentalService.findAll();
-    return rentals.filter(rental => rental.property.owner.id === req.user.id);
+    return this.rentalService.findAll(req.user.id);
   }
 
   @Get(':id')
@@ -42,7 +42,7 @@ export class RentalController {
   async findOne(
     @Param('id') id: string,
     @CheckOwnership({
-      serviceClass: RentalService,
+      serviceClass: PropertyOwnershipService,
       verifyMethod: 'verifyPropertyOwner',
       errorMessage: 'Vous n\'êtes pas autorisé à voir cette location'
     }) isOwner: boolean
@@ -53,17 +53,26 @@ export class RentalController {
   @Get('property/:propertyId')
   @Roles('OWNER')
   @UseGuards(RoleGuard)
-  async findByProperty(@Param('propertyId') propertyId: string, @Req() req) {
-    const rentals = await this.rentalService.findByProperty(+propertyId);
-    return rentals.filter(rental => rental.property.owner.id === req.user.id);
+  async findByProperty(
+    @Param('propertyId') propertyId: string,
+    @CheckOwnership({
+      serviceClass: PropertyOwnershipService,
+      verifyMethod: 'verifyPropertyOwner',
+      idField: 'propertyId',
+      errorMessage: 'Vous n\'êtes pas autorisé à voir les locations de cette propriété'
+    }) isOwner: boolean
+  ) {
+    return this.rentalService.findByProperty(+propertyId);
   }
 
   @Get('tenant/:tenantId')
   @Roles('OWNER')
   @UseGuards(RoleGuard)
-  async findByTenant(@Param('tenantId') tenantId: string, @Req() req) {
-    const rentals = await this.rentalService.findByTenant(+tenantId);
-    return rentals.filter(rental => rental.property.owner.id === req.user.id);
+  async findByTenant(
+    @Param('tenantId') tenantId: string,
+    @Req() req
+  ) {
+    return this.rentalService.findByTenant(+tenantId, req.user.id);
   }
 
   @Put(':id')
@@ -73,7 +82,7 @@ export class RentalController {
     @Param('id') id: string,
     @Body() updateRentalDto: UpdateRentalDto,
     @CheckOwnership({
-      serviceClass: RentalService,
+      serviceClass: PropertyOwnershipService,
       verifyMethod: 'verifyPropertyOwner',
       errorMessage: 'Vous n\'êtes pas autorisé à modifier cette location'
     }) isOwner: boolean
@@ -87,7 +96,7 @@ export class RentalController {
   async remove(
     @Param('id') id: string,
     @CheckOwnership({
-      serviceClass: RentalService,
+      serviceClass: PropertyOwnershipService,
       verifyMethod: 'verifyPropertyOwner',
       errorMessage: 'Vous n\'êtes pas autorisé à supprimer cette location'
     }) isOwner: boolean
@@ -101,7 +110,7 @@ export class RentalController {
   async activate(
     @Param('id') id: string,
     @CheckOwnership({
-      serviceClass: RentalService,
+      serviceClass: PropertyOwnershipService,
       verifyMethod: 'verifyPropertyOwner',
       errorMessage: 'Vous n\'êtes pas autorisé à activer cette location'
     }) isOwner: boolean
@@ -115,7 +124,7 @@ export class RentalController {
   async deactivate(
     @Param('id') id: string,
     @CheckOwnership({
-      serviceClass: RentalService,
+      serviceClass: PropertyOwnershipService,
       verifyMethod: 'verifyPropertyOwner',
       errorMessage: 'Vous n\'êtes pas autorisé à désactiver cette location'
     }) isOwner: boolean
@@ -130,7 +139,7 @@ export class RentalController {
     @Param('id') id: string,
     @Body() body: { furniture: string[] },
     @CheckOwnership({
-      serviceClass: RentalService,
+      serviceClass: PropertyOwnershipService,
       verifyMethod: 'verifyPropertyOwner',
       errorMessage: 'Vous n\'êtes pas autorisé à modifier les meubles de cette location'
     }) isOwner: boolean
@@ -145,7 +154,7 @@ export class RentalController {
     @Param('id') id: string,
     @Body() body: { furniture: string[] },
     @CheckOwnership({
-      serviceClass: RentalService,
+      serviceClass: PropertyOwnershipService,
       verifyMethod: 'verifyPropertyOwner',
       errorMessage: 'Vous n\'êtes pas autorisé à modifier les meubles de cette location'
     }) isOwner: boolean
@@ -160,7 +169,7 @@ export class RentalController {
     @Param('id') id: string,
     @Body() body: { notes: string },
     @CheckOwnership({
-      serviceClass: RentalService,
+      serviceClass: PropertyOwnershipService,
       verifyMethod: 'verifyPropertyOwner',
       errorMessage: 'Vous n\'êtes pas autorisé à effectuer l\'état des lieux d\'entrée'
     }) isOwner: boolean
@@ -175,7 +184,7 @@ export class RentalController {
     @Param('id') id: string,
     @Body() body: { notes: string },
     @CheckOwnership({
-      serviceClass: RentalService,
+      serviceClass: PropertyOwnershipService,
       verifyMethod: 'verifyPropertyOwner',
       errorMessage: 'Vous n\'êtes pas autorisé à effectuer l\'état des lieux de sortie'
     }) isOwner: boolean

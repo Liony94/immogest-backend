@@ -40,7 +40,7 @@ export class RentalService implements IRentalService {
     return this.rentalRepository.save(rental);
   }
 
-  async findAll(): Promise<Rental[]> {
+  async findAll(userId: number): Promise<Rental[]> {
     return this.rentalRepository.find({
       relations: {
         property: {
@@ -48,6 +48,13 @@ export class RentalService implements IRentalService {
         },
         tenant: true,
         paymentSchedules: true
+      },
+      where: {
+        property: {
+          owner: {
+            id: userId
+          }
+        }
       }
     });
   }
@@ -78,9 +85,16 @@ export class RentalService implements IRentalService {
     });
   }
 
-  async findByTenant(tenantId: number): Promise<Rental[]> {
+  async findByTenant(tenantId: number, userId: number): Promise<Rental[]> {
     return this.rentalRepository.find({
-      where: { tenant: { id: tenantId } },
+      where: { 
+        tenant: { id: tenantId },
+        property: {
+          owner: {
+            id: userId
+          }
+        }
+      },
       relations: ['property', 'paymentSchedules']
     });
   }

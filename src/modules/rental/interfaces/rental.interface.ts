@@ -4,10 +4,10 @@ import { Rental } from '../../../entities/rental.entity';
 
 export interface IRentalService {
   create(createRentalDto: CreateRentalDto): Promise<Rental>;
-  findAll(): Promise<Rental[]>;
+  findAll(userId: number): Promise<Rental[]>;
   findOne(id: number): Promise<Rental>;
   findByProperty(propertyId: number): Promise<Rental[]>;
-  findByTenant(tenantId: number): Promise<Rental[]>;
+  findByTenant(tenantId: number, userId: number): Promise<Rental[]>;
   update(id: number, updateRentalDto: UpdateRentalDto): Promise<Rental>;
   remove(id: number): Promise<void>;
   activate(id: number): Promise<Rental>;
